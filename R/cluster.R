@@ -13,7 +13,7 @@ clusterVariable <- R6::R6Class(
     initialize = function(k = 3, data = NULL, method_algo = "correlation", donnee_nettoyee = TRUE ) {
       self$k <- k
       self$method_algo <- method_algo
-      self$resultat_cluster <- resultat_cluster
+      self$resultat_cluster <- NULL
 
       # Vérification
       if (!is.null(data)) {
@@ -78,22 +78,30 @@ clusterVariable <- R6::R6Class(
     },
 
 
-#========================fonction de fit================================
+    #========================fonction de fit================================
     fit = function() {
-       stopifnot(!is.null(self$data))
-       if(self$method_algo == "correlation"){
-         self
-       } else {
-         stop("Methode  non reconnue")
-       }
+      stopifnot(!is.null(self$data) )
+      #Méthode de réallocation
+      if((self$method_algo == "kmeans") & (is.numeric(as.matrix(self$data))) ){
+        set.seed(123)  # Pour la reproductibilité
+        self$resultat_cluster <- kmeans(t(self$data), centers = self$k)
+
+      } else {
+        stop("Methode  non reconnue")
+      }
     } ,
 
-#========================fonction de predict================================
+    #========================fonction de predict================================
     predict =  function(new_data) {
       #stoper si il y'a pas de cluster
-      stopifnot(!is.null(self$resultat_cluster) )
-      if(self$method_algo == "correlation"){
-        predictions = data.frame(c(1 , 2,3))
+      if (is.null(self$resultat_cluster)) {
+        stop("Clustering non realisé. Faites fit() d'abord.")
+      }
+      if(self$method_algo == "kmeans"){
+        centre <- self$resultat_cluster$centers    #moyenne de chaue cluster
+        distances <- as.matrix(dist(rbind(centers, new_data)))[-(1:nrow(centers)), 1:nrow(centers)]  #distance entre         les nouvelles données et les centres
+        cluster_assigne <- apply(distances, 1, which.min) #assigner chaque nouvelle donnée au cluster le plus proche
+        return(cluster_assigne)
       } else {
         stop("Methode  non reconnue")
       }
@@ -102,19 +110,56 @@ clusterVariable <- R6::R6Class(
 
 
 
-#======================== fonction de summary================================
-summary = fonction() {
-  cat("Résumé du clustering de variables :\n")
-}
-
-
-    # Affichage de l'objet
-    print = function() {
-      cat("Clustering de variables avec k =", self$k, "et la méthode =", self$method_algo, "\n")
-      if (!is.null(self$data)) {
-        cat("Nombre de variables :", ncol(self$data), "\n")
+    #======================== fonction de summary================================
+    summary = function() {
+      if (is.null(self$resultat_cluster)) {
+        stop("Clustering non realisé. Faites fit() d'abord.")
       }
-    }
+      if(self$method_algo == "kmeans"){
+        cat("methode" , self$method_algo , "\n")
+        cat("nombre de clusters :" , self$k , "\n")
+        cat("nombre de variable par cluster :")
+        for(i in 1:self$k){
+          cat("\n Cluster" , i , ":" , sum(self$resultat_cluster$cluster == i))
+        }
+        cat("\n les variables par cluster :\n")
+        for(i in 1:self$k){
+          cat("\n Cluster" , i , ":")
+          vars_in_cluster <- names(self$data)[which(self$resultat_cluster$cluster == i)]
+          cat(vars_in_cluster, sep = ", ")
+        }
+      } else {
+        stop("Methode  non reconnue")
+      }
+
+    } ,
+
+    #======================== visualiser des cluster ================================
+    visualiser_clusters = function() {
+      if (is.null(self$resultat_cluster)) {
+        stop("Clustering non réalisé. Faites fit() d'abord.")}
+      if (self$method_algo == "kmeans") {
+        library(factoextra)
+        library(ggplot2)
+        #plot des clusters
+        fviz_cluster(self$resultat_cluster, data = t(self$data),
+
+                     main = "Visualisation des clusters de variables")
+       } else {
+          cat("Méthode de clustering non supportée pour la visualisation.")
+        }
+      }   ,
+
+
+
+
+      #======================== Affichage de l'objet================================
+      print = function() {
+        cat("Clustering de variables avec k =", self$k, "et la méthode =", self$method_algo, "\n")
+        if (!is.null(self$data)) {
+
+        }
+      }
 
   )
 )
@@ -124,9 +169,23 @@ summary = fonction() {
 
 
 
-# #Exemple d’appel de la classe
-# data1 = c(1 ,2,3,4,5,NA,7,8,9,10)
-# data1 = as.data.frame(data1)
-#
-#  cluster_var <- clusterVariable$new(k = 4, data = data1, method_algo = "correlation", donnee_nettoyee = TRUE)
-# cluster_var$print()
+#==================== exemple d'utilisation ==============================
+# Exemple de dataframe avec 6 variables numériques
+set.seed(123)
+data_numeric <- data.frame(
+  var1 = rnorm(10, mean = 5, sd = 2),
+  var2 = rnorm(10, mean = 10, sd = 3),
+  var3 = rnorm(10, mean = 5, sd = 1),
+  var4 = rnorm(10, mean = 7, sd = 2),
+  var5 = rnorm(10, mean = 10, sd = 3),
+  var6 = rnorm(10, mean = 6, sd = 1)
+)
+
+cluster_model <- clusterVariable$new(k = 3, data = data_numeric, method_algo = "kmeans", donnee_nettoyee = FALSE)
+
+cluster_model$fit()
+
+cluster_model$summary()
+
+cluster_model$visualiser_clusters()
+
