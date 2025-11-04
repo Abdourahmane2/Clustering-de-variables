@@ -33,10 +33,11 @@ ui <- navbarPage(
   tabPanel("Nettoyage",
            sidebarLayout(
              sidebarPanel(
-              checkboxInput("supprimer_na", "Supprimer les lignes avec des valeurs manquantes", value = FALSE),
-              checkboxInput("normaliser", "normaliser les donnes numeriques ", value = FALSE),
-              checkboxInput("supprimer_outliers", "Supprimer les valeurs aberantes ", value = FALSE),
-              actionButton("nettoyer", "appliquer le nettoyage") ,
+               checkboxInput("supprimer_na", "Remplacer les variables numeriques par la moyenne et les variables categorielle par manquant", value = FALSE),
+               checkboxInput("normaliser", "normaliser les donnes numeriques ", value = FALSE),
+               checkboxInput("supprimer_outliers", "Supprimer les valeurs aberantes ", value = FALSE),
+               actionButton("nettoyer", "appliquer le nettoyage") ,
+               actionButton("passer_clustering", "Passer au clustering")
 
              ),
              mainPanel(
