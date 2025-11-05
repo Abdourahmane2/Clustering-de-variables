@@ -4,6 +4,7 @@ library(factoextra)
 library(klaR)
 library(proxy)
 
+
 clusterVariable <- R6::R6Class(
   "clusterVariable",
   public = list(
@@ -35,11 +36,7 @@ clusterVariable <- R6::R6Class(
       # Clustering sur des variables quanti (kmeans)
       if((self$method_algo == "kmeans") & (is.numeric(as.matrix(self$data)))) {
         set.seed(123)
-        self$resultat_cluster <- kmeans(t(self$data), centers = self$k)
-
-        # Calcul du score silhouette
-        sil <- silhouette(self$resultat_cluster$cluster, dist(t(self$data)))
-        cat("Silhouette score moyen :", mean(sil[, 3]), "\n")
+        self$resultat_cluster <- mon_kmeans((self$data), k = self$k)
       }
 
       # Clustering des variables quali (kmodes)
@@ -64,7 +61,7 @@ clusterVariable <- R6::R6Class(
         dist_matrix <- daisy(data_t_df, metric = "gower")
         hc <- hclust(dist_matrix, method = "ward.D2")
         self$resultat_cluster <- cutree(hc, k = self$k)
-         plot(hc, main = "Dendrogramme des variables")
+        plot(hc, main = "Dendrogramme des variables")
 
 
       }
@@ -78,31 +75,55 @@ clusterVariable <- R6::R6Class(
     predict = function(nouveau_data) {
       if (is.null(self$resultat_cluster)) stop("Clustering non réalisé. Faites fit() d'abord.")
 
-      # Vérifier que les nouvelles données ont les mêmes colonnes
+      # Vérification du type
+      if (!is.data.frame(nouveau_data) && !is.matrix(nouveau_data)) {
+        stop("Erreur : 'nouveau_data' doit être un data.frame ou une matrice")
+      }
+
+      # Vérifier que les colonnes correspondent
       if (!all(colnames(nouveau_data) %in% colnames(self$data))) {
         stop("Les colonnes ne sont pas les mêmes que les données d'entraînement")
       }
-
+      data_t <- t(nouveau_data)
       if (self$method_algo == "kmeans") {
-        centres <- self$resultat_cluster$centers
-        distances <- as.matrix(dist(rbind(centres, nouveau_data)))[-(1:nrow(centres)), 1:nrow(centres)]
-        cluster_assigne <- apply(distances, 1, which.min)
-        return(cluster_assigne)
-      }  else if(self$method_algo == "kmodes") {
-        cluster_mode =  self$resultat_cluster$modes
+       centres <- self$resultat_cluster$centers
+
+        # Calcul des distances
+        distances <- matrix(NA, nrow = nrow(centres), ncol = nrow(data_t))
+        for (i in 1:nrow(centres)) {
+          distances[i, ] <- rowSums((data_t - matrix(centres[i, ], nrow = nrow(data_t), ncol = ncol(data_t), byrow = TRUE))^2)
+        }
+        clusters_assigne <- apply(distances, 2, which.min)
+
+      } else if (self$method_algo == "kmodes") {
+        cluster_mode <- self$resultat_cluster$modes
         distances <- as.matrix(proxy::dist(rbind(cluster_mode, nouveau_data), method = "Hamming"))[-(1:nrow(cluster_mode)), 1:nrow(cluster_mode)]
-        cluster_assigne <- apply(distances, 1, which.min)
-        return(cluster_assigne)
-      }   else if (self$method_algo == "hierarchical") {
-        dist  <- dist(rbind(t(self$data), t(nouveau_data)))
-        hc <- hclust(dist, method = "ward.D2")
-        cluster_assigne <- cutree(hc, k = self$k)[(ncol(self$data)+1):(ncol(self$data)+ncol(nouveau_data))]
-        return(cluster_assigne)
-      }
-      else {
+        clusters_assigne <- apply(distances, 1, which.min)
+
+      } else if (self$method_algo == "hierarchical") {
+        dist_mat <- daisy(rbind(t(self$data), t(nouveau_data)), metric = "gower")
+        hc <- hclust(dist_mat, method = "ward.D2")
+        clusters_assigne <- cutree(hc, k = self$k)[(ncol(self$data)+1):(ncol(self$data)+ncol(nouveau_data))]
+
+      } else {
         stop("Méthode non reconnue")
       }
-    },
+
+      # Création de l'objet R6 pour le résultat
+      pred_obj <- clusterVariable$new(
+        data = nouveau_data,
+        k = self$k,
+        method_algo = self$method_algo
+      )
+      pred_obj$resultat_cluster <- list(
+        cluster = clusters_assigne,
+        centers = if (self$method_algo == "kmeans") self$resultat_cluster$centers else NULL,
+        modes = if (self$method_algo == "kmodes") self$resultat_cluster$modes else NULL
+      )
+
+      return(pred_obj)
+    } ,
+
 
     #======================== Summary =====================================
     summary = function() {
@@ -121,8 +142,10 @@ clusterVariable <- R6::R6Class(
         for (i in 1:self$k) {
           cat("\nCluster", i, ": ")
           vars_in_cluster <- names(self$data)[which(self$resultat_cluster$cluster == i)]
-          cat(vars_in_cluster, sep = ", ")
+          cat(vars_in_cluster, sep = ",")
+
         }
+        cat("\n")
       } else if (self$method_algo == "kmodes") {
         cat("Méthode :", self$method_algo, "\n")
         cat("Nombre de clusters :", self$k, "\n")
@@ -169,8 +192,15 @@ clusterVariable <- R6::R6Class(
       if (self$method_algo == "kmeans") {
         library(factoextra)
         library(ggplot2)
-        fviz_cluster(self$resultat_cluster, data = t(self$data),
-                     main = "Visualisation des clusters de variables")
+        pseudo_kmeans <- list(
+          cluster = self$resultat_cluster$cluster,
+          centers = self$resultat_cluster$centers
+        )
+        D <- as.dist(1 - cor((self$data), use = "pairwise.complete.obs"))
+        hc <- hclust(D, method = "ward.D2")
+        K <- self$k
+        factoextra::fviz_dend(hc, k = K, cex = 0.9,
+                              main = "Dendrogramme des variables (distance corrélation)")
       }
       else if (self$method_algo == "kmodes") {
         library(cluster)
@@ -185,6 +215,42 @@ clusterVariable <- R6::R6Class(
         cat("Méthode de clustering non supportée pour la visualisation.\n")
       }
     },
+
+    #========================tracer la coude ========================
+    tracer_coude = function(k_max = 5) {
+      if (is.null(self$data)) stop("Les données n'ont pas été définies")
+      if (k_max > nrow(t(self$data))) {
+        stop("Le nombre de clusters 'k' ne peut pas être supérieur au nombre de variables.")
+      }
+      inertie <- numeric(k_max)  # vecteur pour stocker l’inertie
+
+      for (k in 1:k_max) {
+        set.seed(123)
+        # utiliser la version pour variables
+        kmeans_result <- mon_kmeans(self$data, k = k)
+
+        centres <- kmeans_result$centers
+        clusters <- kmeans_result$cluster
+
+        # Calcul de l'inertie intra-cluster
+        sum_sq <- 0
+        data_t <- t(self$data)
+
+        for (i in 1:k) {
+          points_cluster <- data_t[clusters == i, , drop = FALSE]
+          if (nrow(points_cluster) > 0) {
+            sum_sq <- sum_sq + sum(rowSums((points_cluster - matrix(centres[i, ], nrow = nrow(points_cluster), ncol =             ncol(points_cluster), byrow = TRUE))^2))
+          }
+        }
+        inertie[k] <- sum_sq
+      }
+
+      # Tracer la courbe du coude
+      plot(1:k_max, inertie, type = "b",
+           xlab = "Nombre de clusters (k)",
+           ylab = "Inertie intra-cluster",
+           main = "Méthode du coude")
+    } ,
 
     #======================== Interprétation des clusters =================
     interprete_clusters = function() {
@@ -304,6 +370,14 @@ data_numeric <- data.frame(
   var5 = rnorm(10, mean = 10, sd = 3),
   var6 = rnorm(10, mean = 6, sd = 1)
 )
+data_predict <- data.frame(
+  var1 = rnorm(10, mean = 5, sd = 2),
+  var2 = rnorm(10, mean = 10, sd = 3),
+  var3 = rnorm(10, mean = 5, sd = 1),
+  var4 = rnorm(10, mean = 7, sd = 2),
+  var5 = rnorm(10, mean = 10, sd = 3),
+  var6 = rnorm(10, mean = 6, sd = 1)   )
+
 
 data_quali =  data.frame(
   var1 = as.factor(sample(c("A", "B", "C"), 10, replace = TRUE)),
@@ -321,14 +395,14 @@ donne_mixte = data.frame(
 
 
 
-cluster_mixte <- clusterVariable$new(
-  k = 2,
-  data = donne_mixte,
-  method_algo = "hierarchical"
-)
-cluster_mixte$fit()
-cluster_mixte$summary()
-cluster_mixte$visualiser_clusters()
+# cluster_mixte <- clusterVariable$new(
+#   k = 2,
+#   data = donne_mixte,
+#   method_algo = "hierarchical"
+# )
+# cluster_mixte$fit()
+# cluster_mixte$summary()
+# cluster_mixte$visualiser_clusters()
 
 #=============================
 
@@ -345,15 +419,15 @@ cluster_mixte$visualiser_clusters()
 
 #=========================================
 
-# cluster_quanti <- clusterVariable$new(
-#   k = 2,
-#   data = data_numeric,
-#   method_algo = "kmeans",
-#   donnee_nettoyee = TRUE
-# )
-#
-# cluster_quanti$fit()
-# cluster_quanti$summary()
-# cluster_quanti$visualiser_clusters()
-# cluster_quanti$interprete_clusters()
-# cluster_quanti$print()
+cluster_quanti <- clusterVariable$new(
+  k = 3,
+  data = data_numeric,
+  method_algo = "kmeans",
+  donnee_nettoyee = TRUE
+)
+
+cluster_quanti$fit()
+test <- cluster_quanti$predict(data_predict)
+test$summary()
+test$tracer_coude()
+test$visualiser_clusters()
