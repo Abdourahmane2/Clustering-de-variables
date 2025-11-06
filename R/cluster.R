@@ -13,6 +13,8 @@ clusterVariable <- R6::R6Class(
     method_algo = NULL,
     resultat_cluster = NULL,
 
+
+
     #======================== Constructeur ================================
     initialize = function(k = 3, data = NULL, method_algo = "correlation", donnee_nettoyee = FALSE ) {
       self$k <- k
@@ -71,6 +73,8 @@ clusterVariable <- R6::R6Class(
       }
     },
 
+
+
     #======================== Predict =====================================
     predict = function(nouveau_data) {
       if (is.null(self$resultat_cluster)) stop("Clustering non réalisé. Faites fit() d'abord.")
@@ -123,6 +127,9 @@ clusterVariable <- R6::R6Class(
 
       return(pred_obj)
     } ,
+
+
+
 
 
     #======================== Summary =====================================
@@ -185,6 +192,10 @@ clusterVariable <- R6::R6Class(
 
     },
 
+
+
+
+
     #======================== Visualiser clusters ========================
     visualiser_clusters = function() {
       if (is.null(self$resultat_cluster)) stop("Clustering non réalisé. Faites fit() d'abord.")
@@ -215,6 +226,11 @@ clusterVariable <- R6::R6Class(
         cat("Méthode de clustering non supportée pour la visualisation.\n")
       }
     },
+
+
+
+
+
 
     #========================tracer la coude ========================
     tracer_coude = function(k_max = 5) {
@@ -251,6 +267,12 @@ clusterVariable <- R6::R6Class(
            ylab = "Inertie intra-cluster",
            main = "Méthode du coude")
     } ,
+
+
+
+
+
+
 
     #======================== Interprétation des clusters =================
     interprete_clusters = function() {
@@ -300,6 +322,11 @@ clusterVariable <- R6::R6Class(
     } ,
 
 
+
+
+
+
+
     #======================== Affichage ===============================
     print = function() {
       if(self$method_algo == "kmeans" | self$method_algo == "kmodes") {
@@ -314,6 +341,8 @@ clusterVariable <- R6::R6Class(
         cat("Méthode non reconnue\n")
       }}
   ),
+
+
 
   private = list(
     appliquer_nettoyage = function(data) {
