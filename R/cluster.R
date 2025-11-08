@@ -16,7 +16,7 @@ clusterVariable <- R6::R6Class(
 
 
     #======================== Constructeur ================================
-    initialize = function(k = 3, data = NULL, method_algo = "correlation", donnee_nettoyee = FALSE ) {
+    initialize = function(k = 3, data = NULL, method_algo = "Kmeans", donnee_nettoyee = FALSE ) {
       self$k <- k
       self$method_algo <- method_algo
       self$resultat_cluster <- NULL
@@ -28,6 +28,9 @@ clusterVariable <- R6::R6Class(
         if (donnee_nettoyee == TRUE) {
           self$data <- private$appliquer_nettoyage(self$data)
         }
+      }
+      if(missing(method_algo)) {
+        stop("La methode de clustering doit être  renseigne")
       }
     },
 

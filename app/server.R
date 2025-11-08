@@ -107,18 +107,22 @@ server <- function(input, output, session) {
     )
   })
 
+
   # ==== Statistiques descriptives ====
   output$statistiques_ui <- renderUI({
     req(cleaned_data())
     df <- cleaned_data()
 
     tagList(
-      h4("Statistiques descriptives"),
       DT::datatable(summary(df)),
+
+      hr(),
 
       h4("Dimensions"),
       HTML(paste("Nombre de lignes :", nrow(df), "<br>",
                  "Nombre de colonnes :", ncol(df))),
+
+      hr(),
 
       h4("Types des colonnes"),
       DT::datatable(
@@ -129,8 +133,21 @@ server <- function(input, output, session) {
   })
 
   #========  passer au clustering ===============
+
   observeEvent(input$passer_clustering, {
     req(cleaned_data())
     updateNavbarPage(session, "onglets", selected = "Clustering")
+  })
+
+
+#===apercu des donne netoyes dans la page clustering===
+  # tableOutput("tableau_cluster"),
+  output$tableau_cluster <- renderDT({
+    req(cleaned_data())
+    datatable(
+      head(cleaned_data(), 5),
+      options = list(pageLength = 10, scrollX = TRUE),
+      rownames = FALSE
+    )
   })
 }
