@@ -33,8 +33,4 @@ mon_kmeans <- function(data, max_iter = 100, k = 3) {
   return(list(centers = centers, cluster = cluster))
 }
 
-# Exemple
-data <- cbind(c(1,2,1,2,3,6,7,8,9), c(1,1,2,2,3,6,7,8,9))
-res <- mon_kmeans(data, k = 2)
-res$centers
-res$cluster
+

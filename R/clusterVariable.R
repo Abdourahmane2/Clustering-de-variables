@@ -1,8 +1,12 @@
+#' @include mon_kmeans.R
+NULL
+
 library(R6)
 library(cluster)
 library(factoextra)
 library(klaR)
 library(proxy)
+
 
 
 clusterVariable <- R6::R6Class(
@@ -72,7 +76,7 @@ clusterVariable <- R6::R6Class(
       }
 
       else {
-        stop("Méthode non reconnue")
+        stop("Méthode non reconnue ou type de données incompatible avec la méthode choisie.")
       }
     },
 
@@ -195,7 +199,28 @@ clusterVariable <- R6::R6Class(
 
     },
 
+  ##=====================heatmap des clusters =========================
 
+  heatmap_clusters = function() {
+    if (is.null(self$resultat_cluster)) {
+      stop("Clustering non réalisé. Faites fit() d'abord.")
+    }
+
+
+      centers <- self$resultat_cluster$centers
+      rownames(centers) <- paste0("Cluster_", 1:nrow(centers))
+
+      # Affichage de la heatmap
+       pheatmap::pheatmap(
+        centers,
+        main = "Heatmap des centres des clusters",
+        cluster_rows = TRUE,
+        cluster_cols = TRUE,
+        fontsize_row = 10,
+        fontsize_col = 10,
+        angle_col = 45
+      )
+  }  ,
 
 
 
@@ -204,17 +229,21 @@ clusterVariable <- R6::R6Class(
       if (is.null(self$resultat_cluster)) stop("Clustering non réalisé. Faites fit() d'abord.")
 
       if (self$method_algo == "kmeans") {
-        library(factoextra)
-        library(ggplot2)
-        pseudo_kmeans <- list(
-          cluster = self$resultat_cluster$cluster,
-          centers = self$resultat_cluster$centers
+        # self$resultat_cluster must be a kmeans object (class "kmeans")
+        p <- factoextra::fviz_cluster(
+          object = list(
+            centers = self$resultat_cluster$centers,
+            cluster = self$resultat_cluster$cluster,
+            data = t(self$data)
+          ),
+          data   = as.data.frame(self$data_scaled),
+          ellipse.type = "convex",
+          palette = "jco",
+          repel   = TRUE,
+          geom    = "point",
+          ggtheme = ggplot2::theme_minimal()
         )
-        D <- as.dist(1 - cor((self$data), use = "pairwise.complete.obs"))
-        hc <- hclust(D, method = "ward.D2")
-        K <- self$k
-        factoextra::fviz_dend(hc, k = K, cex = 0.9,
-                              main = "Dendrogramme des variables (distance corrélation)")
+        return(p)
       }
       else if (self$method_algo == "kmodes") {
         library(cluster)
@@ -324,6 +353,24 @@ clusterVariable <- R6::R6Class(
       }
     } ,
 
+# ========== indice pour la qualite du clustering =====================
+indice_silhoute = function() {
+  if (is.null(self$resultat_cluster)) stop("Clustering non réalisé. Faites fit() d'abord.")
+
+  data_t <- as.data.frame(t(self$data))
+  dist_matrix <- dist(data_t)
+
+  # Vérification et extraction du vecteur de clusters
+  clusters <- self$resultat_cluster$cluster
+
+
+
+  # Calcul du silhouette
+  sil <- silhouette(clusters, dist_matrix)
+
+  # Retourner la moyenne de la largeur des silhouettes
+  return(mean(sil[, "sil_width"]))
+} ,
 
 
 
@@ -392,74 +439,3 @@ clusterVariable <- R6::R6Class(
   )
 )
 
-#==================== Exemple d'utilisation ==============================
-set.seed(123)
-data_numeric <- data.frame(
-  var1 = rnorm(10, mean = 5, sd = 2),
-  var2 = rnorm(10, mean = 10, sd = 3),
-  var3 = rnorm(10, mean = 5, sd = 1),
-  var4 = rnorm(10, mean = 7, sd = 2),
-  var5 = rnorm(10, mean = 10, sd = 3),
-  var6 = rnorm(10, mean = 6, sd = 1)
-)
-data_predict <- data.frame(
-  var1 = rnorm(10, mean = 5, sd = 2),
-  var2 = rnorm(10, mean = 10, sd = 3),
-  var3 = rnorm(10, mean = 5, sd = 1),
-  var4 = rnorm(10, mean = 7, sd = 2),
-  var5 = rnorm(10, mean = 10, sd = 3),
-  var6 = rnorm(10, mean = 6, sd = 1)   )
-
-
-data_quali =  data.frame(
-  var1 = as.factor(sample(c("A", "B", "C"), 10, replace = TRUE)),
-  var2 = as.factor(sample(c("X", "Y"), 10, replace = TRUE)),
-  var3 = as.factor(sample(c("Red", "Blue", "Green"), 10, replace = TRUE)),
-  var4 = as.factor(sample(c("Low", "Medium", "High"), 10, replace = TRUE))
-)
-
-donne_mixte = data.frame(
-  var1 = rnorm(10, mean = 5, sd = 2),
-  var2 = as.factor(sample(c("A", "B", "C"), 10, replace = TRUE)),
-  var3 = rnorm(10, mean = 10, sd = 3),
-  var4 = as.factor(sample(c("X", "Y"), 10, replace = TRUE))
-)
-
-
-
-# cluster_mixte <- clusterVariable$new(
-#   k = 2,
-#   data = donne_mixte,
-#   method_algo = "hierarchical"
-# )
-# cluster_mixte$fit()
-# cluster_mixte$summary()
-# cluster_mixte$visualiser_clusters()
-
-#=============================
-
-
-# cluster_quali <- clusterVariable$new(
-#   k = 2,
-#   data = data_quali,
-#   method_algo = "kmodes",
-#   donnee_nettoyee = FALSE
-# )
-# cluster_quali$fit()
-# cluster_quali$summary()
-# cluster_quali$visualiser_clusters()
-
-#=========================================
-
-cluster_quanti <- clusterVariable$new(
-  k = 3,
-  data = data_numeric,
-  method_algo = "kmeans",
-  donnee_nettoyee = TRUE
-)
-
-cluster_quanti$fit()
-test <- cluster_quanti$predict(data_predict)
-test$summary()
-test$tracer_coude()
-test$visualiser_clusters()

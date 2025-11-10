@@ -1,8 +1,13 @@
 library(DT)
 library(readxl)
 library(shiny)
+#importer le package creer dans le dossier R
+library(ClusterVariable)
+
 
 server <- function(input, output, session) {
+  disable("coude")
+  disable("interpreter")
 
   # --- Importation des données ---
   data <- reactive({
@@ -150,4 +155,73 @@ server <- function(input, output, session) {
       rownames = FALSE
     )
   })
+  #quand le user clique sur le bouton lancer le clustering
+  observeEvent(input$lancer, {
+    if (!all(sapply(cleaned_data(), is.numeric)) & input$method == "kmeans") {
+      showNotification("Impossible d'appliquer kmeans : toutes les colonnes doivent être numériques.", type =   "warning")
+      return()  # stoppe l'exécution du reste
+    }
+    req(cleaned_data())
+    cluster_quanti <- clusterVariable$new(
+      k = input$k,
+      data = cleaned_data(),
+      method_algo = tolower(input$method)  #pour le mettre en minuscule
+    )
+    cluster_quanti$fit()
+    enable("coude")
+    enable("interpreter")
+
+    output$Résumé <- renderPrint({
+      cluster_quanti$summary()
+    })
+  })
+
+#si le user clique sur visualiser
+  observeEvent(input$coude, {
+    req(cleaned_data())
+    cluster_quanti <- clusterVariable$new(
+      k = input$k,
+      data = cleaned_data(),
+      method_algo = tolower(input$method)  #pour le mettre en minuscule
+    )
+    cluster_quanti$fit()
+
+    output$afficher_coude<- renderPlot({
+      print(cluster_quanti$tracer_coude())
+  })
+
+  })
+
+
+  #si le user clique sur le bouton resume
+  observeEvent(input$interpreter, {
+    updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
+    req(cleaned_data())
+    cluster_quanti <- clusterVariable$new(
+      k = input$k,
+      data = cleaned_data(),
+      method_algo = tolower(input$method)  #pour le mettre en minuscule
+    )
+    cluster_quanti$fit()
+
+    output$qualite <- renderPrint({
+      indice <- cluster_quanti$indice_silhoute()
+      if (is.factor(indice)) {
+        indice <- as.numeric(as.character(indice))
+      }
+       cat("la valeur de l'indice de silhoutte est :", round(indice, 4))
+    })
+
+    output$pca_plot <- renderPlot({
+      cluster_quanti$visualiser_clusters()
+    })
+
+    output$heatmap <- renderPlot({
+      cluster_quanti$heatmap_clusters()
+    })
+
+
+    })
+
+
 }
