@@ -161,35 +161,42 @@ server <- function(input, output, session) {
       showNotification("Impossible d'appliquer kmeans : toutes les colonnes doivent être numériques.", type =   "warning")
       return()  # stoppe l'exécution du reste
     }
-    req(cleaned_data())
-    cluster_quanti <- clusterVariable$new(
-      k = input$k,
-      data = cleaned_data(),
-      method_algo = tolower(input$method)  #pour le mettre en minuscule
-    )
-    cluster_quanti$fit()
-    enable("coude")
-    enable("interpreter")
 
-    output$Résumé <- renderPrint({
-      cluster_quanti$summary()
-    })
+    req(cleaned_data())
+    if(input$method == "kmeans"){
+      cluster_quanti <- clusterVariable$new(
+        k = input$k,
+        data = cleaned_data(),
+
+      )
+      cluster_quanti$fit()
+      enable("coude")
+      enable("interpreter")
+
+      output$Résumé <- renderPrint({
+        cluster_quanti$summary()
+      })
+
+    }
+
   })
+
 
 #si le user clique sur visualiser
   observeEvent(input$coude, {
     req(cleaned_data())
+    if(input$method == "kmeans"){
     cluster_quanti <- clusterVariable$new(
       k = input$k,
       data = cleaned_data(),
-      method_algo = tolower(input$method)  #pour le mettre en minuscule
+
     )
     cluster_quanti$fit()
 
     output$afficher_coude<- renderPlot({
       print(cluster_quanti$tracer_coude())
   })
-
+}
   })
 
 
@@ -197,10 +204,11 @@ server <- function(input, output, session) {
   observeEvent(input$interpreter, {
     updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
     req(cleaned_data())
+    if(input$method == "kmeans"){
     cluster_quanti <- clusterVariable$new(
       k = input$k,
       data = cleaned_data(),
-      method_algo = tolower(input$method)  #pour le mettre en minuscule
+
     )
     cluster_quanti$fit()
 
@@ -220,6 +228,26 @@ server <- function(input, output, session) {
       cluster_quanti$heatmap_clusters()
     })
 
+
+
+
+    # Afficher le résumé des partitions et autres résultats dans le texte
+    output$summary_output <- renderPrint({
+      results <- cluster_quanti$resume_cluster()
+      cat("=== Nature des partitions ===\n")
+      print(results$partitions)
+      cat("\n=== Degré d'appartenance aux clusters (Silhouette Score) ===\n")
+      cat("Score moyen de la silhouette : ", results$silhouette_score, "\n")
+      cat("\n=== Distances intra-cluster ===\n")
+      print(results$distances_intra)
+      cat("\n=== Distances inter-cluster ===\n")
+      print(results$dist_inter_cluster)
+    })
+
+
+
+
+        }
 
     })
 

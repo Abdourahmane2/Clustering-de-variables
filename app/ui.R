@@ -155,17 +155,17 @@ ui <- navbarPage(
                            h5("heatmap des centres de clusters"),
                            br()  ,
                            plotOutput("heatmap"),
-                           plotOutput("cluster_distribution"),
-                           plotOutput("cluster_pca_plot")
+
                   ),
 
                   # Onglet 3 : Résumé des Résultats
                   tabPanel("Résumé des Résultats",
                            br() ,
                            h4("Résumé détaillé du clustering"),
-                           verbatimTextOutput("clustering_summary"),
-                           tableOutput("cluster_centroids"),
-                           plotOutput("cluster_distribution")
+                           br() ,
+                           verbatimTextOutput("summary_output"),  # Résumé des clusters
+                           plotOutput("cluster_plot")  # Visualisation graphique des clusters
+
                   )
       )
     )

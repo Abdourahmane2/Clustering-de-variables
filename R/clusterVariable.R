@@ -6,23 +6,20 @@ library(cluster)
 library(factoextra)
 library(klaR)
 library(proxy)
-
-
+library(ggplot2)
+library(pheatmap)
+library(FactoMineR)
 
 clusterVariable <- R6::R6Class(
   "clusterVariable",
   public = list(
     k = NULL,
     data = NULL,
-    method_algo = NULL,
     resultat_cluster = NULL,
 
-
-
     #======================== Constructeur ================================
-    initialize = function(k = 3, data = NULL, method_algo = "Kmeans", donnee_nettoyee = FALSE ) {
+    initialize = function(k = 3, data = NULL, donnee_nettoyee = FALSE ) {
       self$k <- k
-      self$method_algo <- method_algo
       self$resultat_cluster <- NULL
 
       if (!is.null(data)) {
@@ -33,9 +30,6 @@ clusterVariable <- R6::R6Class(
           self$data <- private$appliquer_nettoyage(self$data)
         }
       }
-      if(missing(method_algo)) {
-        stop("La methode de clustering doit être  renseigne")
-      }
     },
 
     #======================== Fit ========================================
@@ -43,44 +37,13 @@ clusterVariable <- R6::R6Class(
       stopifnot(!is.null(self$data))
 
       # Clustering sur des variables quanti (kmeans)
-      if((self$method_algo == "kmeans") & (is.numeric(as.matrix(self$data)))) {
+      if((is.numeric(as.matrix(self$data)))) {
         set.seed(123)
         self$resultat_cluster <- mon_kmeans((self$data), k = self$k)
-      }
-
-      # Clustering des variables quali (kmodes)
-      else if ((self$method_algo == "kmodes") & all(sapply(self$data, is.factor))) {
-        set.seed(123)
-        self$resultat_cluster <- kmodes(t(self$data), modes = self$k)
-
-        # Calcul du silhouette score pour kmodes
-        data_t <- as.data.frame(t(self$data), stringsAsFactors = TRUE)
-        d <- daisy(data_t, metric = "gower")
-        sil <- silhouette(self$resultat_cluster$cluster, d)
-        cat("Silhouette score moyen :", mean(sil[, 3]), "\n")
-      }
-
-      # Clustering des variables mixtes (hiérarchique)
-      else if (self$method_algo == "hierarchical") {
-        set.seed(123)
-
-        # Calcul de la matrice de distance (utilisation de Gower pour les données mixtes)
-        data_t =  t(self$data)
-        data_t_df <- as.data.frame(data_t, stringsAsFactors = TRUE)
-        dist_matrix <- daisy(data_t_df, metric = "gower")
-        hc <- hclust(dist_matrix, method = "ward.D2")
-        self$resultat_cluster <- cutree(hc, k = self$k)
-        plot(hc, main = "Dendrogramme des variables")
-
-
-      }
-
-      else {
-        stop("Méthode non reconnue ou type de données incompatible avec la méthode choisie.")
+      } else {
+        stop("données non numériques ")
       }
     },
-
-
 
     #======================== Predict =====================================
     predict = function(nouveau_data) {
@@ -96,122 +59,59 @@ clusterVariable <- R6::R6Class(
         stop("Les colonnes ne sont pas les mêmes que les données d'entraînement")
       }
       data_t <- t(nouveau_data)
-      if (self$method_algo == "kmeans") {
-       centres <- self$resultat_cluster$centers
+      centres <- self$resultat_cluster$centers
 
-        # Calcul des distances
-        distances <- matrix(NA, nrow = nrow(centres), ncol = nrow(data_t))
-        for (i in 1:nrow(centres)) {
-          distances[i, ] <- rowSums((data_t - matrix(centres[i, ], nrow = nrow(data_t), ncol = ncol(data_t), byrow = TRUE))^2)
-        }
-        clusters_assigne <- apply(distances, 2, which.min)
-
-      } else if (self$method_algo == "kmodes") {
-        cluster_mode <- self$resultat_cluster$modes
-        distances <- as.matrix(proxy::dist(rbind(cluster_mode, nouveau_data), method = "Hamming"))[-(1:nrow(cluster_mode)), 1:nrow(cluster_mode)]
-        clusters_assigne <- apply(distances, 1, which.min)
-
-      } else if (self$method_algo == "hierarchical") {
-        dist_mat <- daisy(rbind(t(self$data), t(nouveau_data)), metric = "gower")
-        hc <- hclust(dist_mat, method = "ward.D2")
-        clusters_assigne <- cutree(hc, k = self$k)[(ncol(self$data)+1):(ncol(self$data)+ncol(nouveau_data))]
-
-      } else {
-        stop("Méthode non reconnue")
+      # Calcul des distances
+      distances <- matrix(NA, nrow = nrow(centres), ncol = nrow(data_t))
+      for (i in 1:nrow(centres)) {
+        distances[i, ] <- rowSums((data_t - matrix(centres[i, ], nrow = nrow(data_t), ncol = ncol(data_t), byrow = TRUE))^2)
       }
+      clusters_assigne <- apply(distances, 2, which.min)
 
       # Création de l'objet R6 pour le résultat
       pred_obj <- clusterVariable$new(
-        data = nouveau_data,
         k = self$k,
-        method_algo = self$method_algo
+        data = nouveau_data
       )
       pred_obj$resultat_cluster <- list(
         cluster = clusters_assigne,
-        centers = if (self$method_algo == "kmeans") self$resultat_cluster$centers else NULL,
-        modes = if (self$method_algo == "kmodes") self$resultat_cluster$modes else NULL
+        centers = self$resultat_cluster$centers
       )
 
       return(pred_obj)
-    } ,
-
-
-
-
+    },
 
     #======================== Summary =====================================
     summary = function() {
       if (is.null(self$resultat_cluster)) stop("Clustering non réalisé. Faites fit() d'abord.")
+      cat("Méthode :", "kmeans", "\n")
+      cat("Nombre de clusters :", self$k, "\n")
+      cat("Nombre de variables par cluster :\n")
 
-      if (self$method_algo == "kmeans") {
-        cat("Méthode :", self$method_algo, "\n")
-        cat("Nombre de clusters :", self$k, "\n")
-        cat("Nombre de variables par cluster :\n")
+      for (i in 1:self$k) {
+        cat("\nCluster", i, ":", sum(self$resultat_cluster$cluster == i))
+      }
 
-        for (i in 1:self$k) {
-          cat("\nCluster", i, ":", sum(self$resultat_cluster$cluster == i))
-        }
-
-        cat("\nVariables par cluster :\n")
-        for (i in 1:self$k) {
-          cat("\nCluster", i, ": ")
-          vars_in_cluster <- names(self$data)[which(self$resultat_cluster$cluster == i)]
-          cat(vars_in_cluster, sep = ",")
-
-        }
-        cat("\n")
-      } else if (self$method_algo == "kmodes") {
-        cat("Méthode :", self$method_algo, "\n")
-        cat("Nombre de clusters :", self$k, "\n")
-        cat("Nombre de variables par cluster :\n")
-
-        for (i in 1:self$k) {
-          cat("\nCluster", i, ":", sum(self$resultat_cluster$cluster == i))
-        }
-
-        cat("\nVariables par cluster :\n")
-        for (i in 1:self$k) {
-          cat("\nCluster", i, ": ")
-          vars_in_cluster <- names(self$data)[which(self$resultat_cluster$cluster == i)]
-          cat(vars_in_cluster, sep = ", ")
-        }
-
-        cat("\n: profil type par cluster : \n")
-        print("joli affichage des profils types")
-        print(self$resultat_cluster$modes)
-
-      } else if (self$method_algo == "hierarchical") {
-        cat('Méthode : ', self$method_algo, '\n')
-        cat('Nombre de clusters : ', self$k, '\n')
-        cat("nombre de variables par cluster :\n")
-        for (i in 1:self$k) {
-          cat('\nCluster', i, ':', sum(self$resultat_cluster == i))
-        }
-        cat('\nVariables par cluster :\n')
-        for (i in 1:self$k) {
-          cat('\nCluster', i, ': ')
-          vars_in_cluster <- names(self$data)[which(self$resultat_cluster == i)]
-          cat(vars_in_cluster, sep = ', ')
-        }
-
-      } else {
-        stop("Méthode non reconnue") }
-
+      cat("\nVariables par cluster :\n")
+      for (i in 1:self$k) {
+        cat("\nCluster", i, ": ")
+        vars_in_cluster <- names(self$data)[which(self$resultat_cluster$cluster == i)]
+        cat(vars_in_cluster, sep = ",")
+      }
+      cat("\n")
     },
 
-  ##=====================heatmap des clusters =========================
-
-  heatmap_clusters = function() {
-    if (is.null(self$resultat_cluster)) {
-      stop("Clustering non réalisé. Faites fit() d'abord.")
-    }
-
+    ##===================== heatmap des clusters =========================
+    heatmap_clusters = function() {
+      if (is.null(self$resultat_cluster)) {
+        stop("Clustering non réalisé. Faites fit() d'abord.")
+      }
 
       centers <- self$resultat_cluster$centers
       rownames(centers) <- paste0("Cluster_", 1:nrow(centers))
 
       # Affichage de la heatmap
-       pheatmap::pheatmap(
+      pheatmap::pheatmap(
         centers,
         main = "Heatmap des centres des clusters",
         cluster_rows = TRUE,
@@ -220,51 +120,28 @@ clusterVariable <- R6::R6Class(
         fontsize_col = 10,
         angle_col = 45
       )
-  }  ,
-
-
+    },
 
     #======================== Visualiser clusters ========================
     visualiser_clusters = function() {
       if (is.null(self$resultat_cluster)) stop("Clustering non réalisé. Faites fit() d'abord.")
-
-      if (self$method_algo == "kmeans") {
-        # self$resultat_cluster must be a kmeans object (class "kmeans")
-        p <- factoextra::fviz_cluster(
-          object = list(
-            centers = self$resultat_cluster$centers,
-            cluster = self$resultat_cluster$cluster,
-            data = t(self$data)
-          ),
-          data   = as.data.frame(self$data_scaled),
-          ellipse.type = "convex",
-          palette = "jco",
-          repel   = TRUE,
-          geom    = "point",
-          ggtheme = ggplot2::theme_minimal()
-        )
-        return(p)
-      }
-      else if (self$method_algo == "kmodes") {
-        library(cluster)
-        library(ggplot2)
-        data_t <- as.data.frame(t(self$data), stringsAsFactors = TRUE)
-        d <- daisy(data_t, metric = "gower")
-        sil <- silhouette(self$resultat_cluster$cluster, d)
-        fviz_silhouette(sil) + ggtitle("Silhouette plot des clusters de variables")
-      }
-
-      else {
-        cat("Méthode de clustering non supportée pour la visualisation.\n")
-      }
+      p <- factoextra::fviz_cluster(
+        object = list(
+          centers = self$resultat_cluster$centers,
+          cluster = self$resultat_cluster$cluster,
+          data = t(self$data)
+        ),
+        data = as.data.frame(self$data_scaled),
+        ellipse.type = "convex",
+        palette = "jco",
+        repel = TRUE,
+        geom = "point",
+        ggtheme = ggplot2::theme_minimal()
+      )
+      return(p)
     },
 
-
-
-
-
-
-    #========================tracer la coude ========================
+    #======================== tracer la coude ========================
     tracer_coude = function(k_max = 5) {
       if (is.null(self$data)) stop("Les données n'ont pas été définies")
       if (k_max > nrow(t(self$data))) {
@@ -287,7 +164,7 @@ clusterVariable <- R6::R6Class(
         for (i in 1:k) {
           points_cluster <- data_t[clusters == i, , drop = FALSE]
           if (nrow(points_cluster) > 0) {
-            sum_sq <- sum_sq + sum(rowSums((points_cluster - matrix(centres[i, ], nrow = nrow(points_cluster), ncol =             ncol(points_cluster), byrow = TRUE))^2))
+            sum_sq <- sum_sq + sum(rowSums((points_cluster - matrix(centres[i, ], nrow = nrow(points_cluster), ncol = ncol(points_cluster), byrow = TRUE))^2))
           }
         }
         inertie[k] <- sum_sq
@@ -297,103 +174,92 @@ clusterVariable <- R6::R6Class(
       plot(1:k_max, inertie, type = "b",
            xlab = "Nombre de clusters (k)",
            ylab = "Inertie intra-cluster",
-           main = "Méthode du coude")
-    } ,
+           main = "Méthode du coude"
+      )
+    },
 
-
-
-
-
-
-
-    #======================== Interprétation des clusters =================
-    interprete_clusters = function() {
+    #======================== resume des clusters  =================
+    resume_cluster = function() {
       if (is.null(self$resultat_cluster)) stop("Clustering non réalisé. Faites fit() d'abord.")
 
-      if (self$method_algo == "kmeans") {
-        library(cluster)
-        library(ggplot2)
-        library(pheatmap)
-        library(FactoMineR)
+      # --- Nature des partitions (Cluster de variables) ---
+      partitions <- data.frame(
+        Cluster = integer(self$k),
+        Nombre_de_variables = integer(self$k),
+        Pourcentage = numeric(self$k)
+      )
 
-        cat("\n=== Statistiques descriptives par cluster ===\n")
-
-        # Affichage des statistiques descriptives pour chaque cluster
-        for (i in 1:self$k) {
-          cat("\nCluster", i, ":\n")
-          vars_in_cluster <- names(self$data)[self$resultat_cluster$cluster == i]
-          # Statistiques descriptives (moyennes, écarts-types, etc.)
-          print(summary(self$data[, vars_in_cluster, drop = FALSE]))
-
-          # Moyennes et écarts-types par cluster
-          cat("\nMoyennes et écarts-types :\n")
-          print(apply(self$data[self$resultat_cluster$cluster == i, ], 2, function(x) c(mean = mean(x), sd = sd(x))))
-        }
-
-
-        # Affichage des distances intra-cluster
-        cat("\n=== Analyse des distances intra-cluster ===\n")
-        for (i in 1:self$k) {
-          # Calcul des distances intra-cluster pour chaque cluster
-          cluster_data <- self$data[self$resultat_cluster$cluster == i, ]
-          dist_matrix <- dist(cluster_data)
-          mean_distance <- mean(dist_matrix)
-          cat("\nCluster", i, " - Distance moyenne intra-cluster : ", mean_distance, "\n")
-        }
-
-        # Affichage des distances inter-cluster entre les centres des clusters
-        cat("\n=== Analyse des distances inter-cluster ===\n")
-        centers <- self$resultat_cluster$centers
-        dist_inter_cluster <- dist(centers)
-        cat("\nDistances inter-cluster entre les centres :\n")
-        print(dist_inter_cluster)
-
-      } else {
-        cat("Méthode de clustering non supportée pour la visualisation.\n")
+      for (i in 1:self$k) {
+        partitions$Cluster[i] <- i
+        partitions$Nombre_de_variables[i] <- sum(self$resultat_cluster$cluster == i)
+        partitions$Pourcentage[i] <- round(partitions$Nombre_de_variables[i] / length(self$resultat_cluster$cluster) * 100, 2)
       }
-    } ,
 
-# ========== indice pour la qualite du clustering =====================
-indice_silhoute = function() {
-  if (is.null(self$resultat_cluster)) stop("Clustering non réalisé. Faites fit() d'abord.")
+      # --- Nature des groupes (Statistiques descriptives pour les variables par cluster) ---
+      groupes <- lapply(1:self$k, function(i) {
+        # Sélectionner les variables appartenant à chaque cluster
+        vars_in_cluster <- names(self$data)[self$resultat_cluster$cluster == i]
+        summary(self$data[, vars_in_cluster, drop = FALSE])
+      })
 
-  data_t <- as.data.frame(t(self$data))
-  dist_matrix <- dist(data_t)
+      # --- Degré d'appartenance des variables aux clusters ---
+      # Calculer l'appartenance des variables à leurs clusters via la distance aux centres
+      dist_to_centers <- sapply(1:self$k, function(i) {
+        cluster_center <- self$resultat_cluster$centers[i, , drop = FALSE]
+        dist_matrix <- dist(t(self$data))  # Distance entre les variables
+        dist_to_center <- rowSums((t(self$data) - matrix(cluster_center, nrow = ncol(self$data), ncol = length(cluster_center), byrow = TRUE))^2)
+        return(dist_to_center)
+      })
 
-  # Vérification et extraction du vecteur de clusters
-  clusters <- self$resultat_cluster$cluster
+      # --- Distances intra-cluster ---
+      distances_intra <- sapply(1:self$k, function(i) {
+        # Variables dans chaque cluster
+        cluster_vars <- self$data[, self$resultat_cluster$cluster == i]
+        dist_matrix <- dist(t(cluster_vars))
+        mean(dist_matrix)
+      })
+
+      # --- Distances inter-cluster entre les centres des clusters ---
+      centers <- self$resultat_cluster$centers
+      dist_inter_cluster <- dist(centers)
+
+      # --- Création des résultats pour l'affichage ---
+      return(list(
+        partitions = partitions,
+        groupes = groupes,
+        dist_to_centers = dist_to_centers,
+        distances_intra = distances_intra,
+        dist_inter_cluster = dist_inter_cluster
+      ))
+    },
 
 
+    # ========== indice pour la qualité du clustering =====================
+    indice_silhoute = function() {
+      if (is.null(self$resultat_cluster)) stop("Clustering non réalisé. Faites fit() d'abord.")
 
-  # Calcul du silhouette
-  sil <- silhouette(clusters, dist_matrix)
+      data_t <- as.data.frame(t(self$data))
+      dist_matrix <- dist(data_t)
 
-  # Retourner la moyenne de la largeur des silhouettes
-  return(mean(sil[, "sil_width"]))
-} ,
+      # Vérification et extraction du vecteur de clusters
+      clusters <- self$resultat_cluster$cluster
 
+      # Calcul du silhouette
+      sil <- silhouette(clusters, dist_matrix)
 
-
-
-
+      # Retourner la moyenne de la largeur des silhouettes
+      return(mean(sil[, "sil_width"]))
+    },
 
     #======================== Affichage ===============================
     print = function() {
-      if(self$method_algo == "kmeans" | self$method_algo == "kmodes") {
-        cat("Clustering de variables avec la méthode :", self$method_algo, "\n")
-        cat("Nombre de clusters :", self$k, "\n")
-        cat("Nombre de variables :", ncol(self$data), "\n")
-      } else if (self$method_algo == "hierarchical") {
-        cat("Clustering hiérarchique de variables\n")
-        cat("Nombre de clusters :", self$k, "\n")
-        cat("Nombre de variables :", ncol(self$data), "\n")
-      } else {
-        cat("Méthode non reconnue\n")
-      }}
+      cat("Clustering de variables avec la méthode :", self$method_algo, "\n")
+      cat("Nombre de clusters :", self$k, "\n")
+      cat("Nombre de variables :", ncol(self$data), "\n")
+    }
   ),
 
-
-
+  #======================== Méthodes privées de nettoyage  ============================
   private = list(
     appliquer_nettoyage = function(data) {
       data <- private$gestion_valeurs_manquantes(data)
@@ -438,4 +304,3 @@ indice_silhoute = function() {
     }
   )
 )
-
