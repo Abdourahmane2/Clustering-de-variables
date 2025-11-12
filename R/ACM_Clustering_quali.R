@@ -8,11 +8,7 @@ library(FactoMineR)
 library(factoextra)
 
 
-# ============================================================================
-# CLASSE UNIFIÉE : ClusteringACM
-# Combine ACM (Analyse des Correspondances Multiples) et 
-# Clustering hiérarchique de variables
-# ============================================================================
+
 
 ClusteringACM <- R6Class(
   "ClusteringACM",
@@ -554,3 +550,4 @@ model$plot_scree()
 # # 9. Prédiction pour nouvelles variables
 # # new_data <- data.frame(...)
 # # predictions <- model$predict(new_data, type = "variables")
+
