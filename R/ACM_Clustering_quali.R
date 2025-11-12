@@ -196,7 +196,7 @@ ClusteringACM <- R6Class(
       cat("   • Nombre de variables:", ncol(self$data), "\n\n")
       
       # --- ACM ---
-      cat("🔍 ANALYSE DES CORRESPONDANCES MULTIPLES (ACM)\n")
+      cat("ANALYSE DES CORRESPONDANCES MULTIPLES (ACM)\n")
       if (self$acm_fitted) {
         cat("   • Statut: ✓ Ajustée\n")
         cat("   • Dimensions:", self$acm_params$ncp, "\n")
@@ -214,7 +214,7 @@ ClusteringACM <- R6Class(
       cat("\n")
       
       # --- Clustering ---
-      cat("🌳 CLUSTERING HIÉRARCHIQUE DE VARIABLES\n")
+      cat("CLUSTERING HIÉRARCHIQUE DE VARIABLES\n")
       if (self$clustering_fitted) {
         cat("   • Statut: ✓ Ajusté\n")
         cat("   • Méthode:", self$method, "\n")
@@ -243,16 +243,16 @@ ClusteringACM <- R6Class(
       }
       
       cat("\n")
-      cat("💡 Utilisez fit() pour ajuster le modèle\n")
-      cat("💡 Utilisez predict() pour faire des prédictions\n")
+      cat("Utilisez fit() pour ajuster le modèle\n")
+      cat(" Utilisez predict() pour faire des prédictions\n")
       
       invisible(self)
     },
     
     
-    # ========================================================================
-    # MÉTHODES ACM - Accesseurs
-    # ========================================================================
+    # =============
+    # MÉTHODES ACM 
+    # =============
     
     get_eigenvalues = function() {
       if (!self$acm_fitted) stop("ACM non ajustée. Utilisez fit()")
@@ -280,9 +280,9 @@ ClusteringACM <- R6Class(
     },
     
     
-    # ========================================================================
-    # MÉTHODES CLUSTERING - Accesseurs
-    # ========================================================================
+    # ====================
+    # MÉTHODES CLUSTERING 
+    # ====================
     
     get_similarity_matrix = function() {
       if (!self$clustering_fitted) {
@@ -299,9 +299,9 @@ ClusteringACM <- R6Class(
     },
     
     
-    # ========================================================================
+    # ==========================
     # MÉTHODES DE VISUALISATION
-    # ========================================================================
+    # ==========================
     
     plot_acm = function(choix = "ind", axes = c(1, 2), ...) {
       if (!self$acm_fitted) stop("ACM non ajustée. Utilisez fit()")
@@ -340,9 +340,9 @@ ClusteringACM <- R6Class(
     },
     
     
-    # ========================================================================
-    # MÉTHODE SUMMARY - Résumé détaillé
-    # ========================================================================
+    # ================
+    # MÉTHODE SUMMARY 
+    # ================
     
     summary = function() {
       cat("\n")
@@ -385,9 +385,9 @@ ClusteringACM <- R6Class(
   ),
   
   
-  # ==========================================================================
+  # ================
   # MÉTHODES PRIVÉES
-  # ==========================================================================
+  # ================
   private = list(
     
     # V de Cramer
@@ -550,4 +550,5 @@ model$plot_scree()
 # # 9. Prédiction pour nouvelles variables
 # # new_data <- data.frame(...)
 # # predictions <- model$predict(new_data, type = "variables")
+
 
