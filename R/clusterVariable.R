@@ -202,15 +202,6 @@ clusterVariable <- R6::R6Class(
         summary(self$data[, vars_in_cluster, drop = FALSE])
       })
 
-      # --- Degré d'appartenance des variables aux clusters ---
-      # Calculer l'appartenance des variables à leurs clusters via la distance aux centres
-      dist_to_centers <- sapply(1:self$k, function(i) {
-        cluster_center <- self$resultat_cluster$centers[i, , drop = FALSE]
-        dist_matrix <- dist(t(self$data))  # Distance entre les variables
-        dist_to_center <- rowSums((t(self$data) - matrix(cluster_center, nrow = ncol(self$data), ncol = length(cluster_center), byrow = TRUE))^2)
-        return(dist_to_center)
-      })
-
       # --- Distances intra-cluster ---
       distances_intra <- sapply(1:self$k, function(i) {
         # Variables dans chaque cluster

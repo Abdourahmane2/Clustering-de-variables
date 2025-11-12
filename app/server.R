@@ -155,10 +155,15 @@ server <- function(input, output, session) {
       rownames = FALSE
     )
   })
-  #quand le user clique sur le bouton lancer le clustering
+
+
+  #==================================si le user clique sur lancer le clustering==================================
+
+
   observeEvent(input$lancer, {
     if (!all(sapply(cleaned_data(), is.numeric)) & input$method == "kmeans") {
-      showNotification("Impossible d'appliquer kmeans : toutes les colonnes doivent être numériques.", type =   "warning")
+      showNotification("Impossible d'appliquer kmeans : toutes les colonnes doivent être numériques.", type =      "warning")
+
       return()  # stoppe l'exécution du reste
     }
 
@@ -178,11 +183,20 @@ server <- function(input, output, session) {
       })
 
     }
-
+    if(input$method == "CAh"){
+       # Aappel les methode de milena
+    }
+     if(input$method == "ACM"){
+       # Aappel les methode de marvin
+     }
   })
 
 
-#si le user clique sur visualiser
+
+
+#=========================si le user clique sur voir coude ==============================
+
+
   observeEvent(input$coude, {
     req(cleaned_data())
     if(input$method == "kmeans"){
@@ -196,13 +210,23 @@ server <- function(input, output, session) {
     output$afficher_coude<- renderPlot({
       print(cluster_quanti$tracer_coude())
   })
-}
+    }
+    if(input$method == "CAh"){
+      # appel les methode de milena
+    }
+     if(input$method == "ACM"){
+       # appel les methode de marvin
+     }
   })
 
 
-  #si le user clique sur le bouton resume
+
+
+  #=============================si le user clique sur le bouton resume    =======================
+
   observeEvent(input$interpreter, {
-    updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
+    updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")  #rediriger vers la page des resultats
+
     req(cleaned_data())
     if(input$method == "kmeans"){
     cluster_quanti <- clusterVariable$new(
@@ -224,9 +248,9 @@ server <- function(input, output, session) {
       cluster_quanti$visualiser_clusters()
     })
 
-    output$heatmap <- renderPlot({
+    "output$heatmap <- renderPlot({
       cluster_quanti$heatmap_clusters()
-    })
+    })"""
 
 
 
@@ -236,8 +260,6 @@ server <- function(input, output, session) {
       results <- cluster_quanti$resume_cluster()
       cat("=== Nature des partitions ===\n")
       print(results$partitions)
-      cat("\n=== Degré d'appartenance aux clusters (Silhouette Score) ===\n")
-      cat("Score moyen de la silhouette : ", results$silhouette_score, "\n")
       cat("\n=== Distances intra-cluster ===\n")
       print(results$distances_intra)
       cat("\n=== Distances inter-cluster ===\n")
@@ -247,7 +269,13 @@ server <- function(input, output, session) {
 
 
 
-        }
+    }
+    if(input$method == "CAh"){
+      # Aappel les methode de milena
+    }
+     if(input$method == "ACM"){
+       # Aappel les methode de marvin
+     }
 
     })
 
