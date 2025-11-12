@@ -271,10 +271,10 @@ server <- function(input, output, session) {
 
     }
     if(input$method == "CAh"){
-      # Aappel les methode de milena
+      # appel les methode de milena
     }
      if(input$method == "ACM"){
-       # Aappel les methode de marvin
+       # appel les methode de marvin
      }
 
     })
