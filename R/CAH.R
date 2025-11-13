@@ -5,8 +5,7 @@ CAH <- R6Class(
   # membres publics
   public = list (
     data = NULL, # Donnée brute
-    stand_data = NULL, #Données centré/réduite
-    X_last = NULL, # Sauvegarde du dernier X standardisé
+    X_last = NULL, # Sauvegarde du dernier X
     method = NULL, # Plus tard methode de ward.D2
     dist_method = NULL, #methode euclidean
     acp_true = NULL, # Booléen : ACP utilisé
@@ -91,15 +90,8 @@ fit = function(method = "ward.D2"){
 
   self$method <- method
 
-# Etape 1 - Standardisation (centrées, réduites)
-
-  self$stand_data <- scale(self$data)
-  #message("1. Données standardisées (centrées et réduites).")
-
-# Etape 2 - Tester la corrélation moyenne (Pour savoir si on fait une ACP ?)
-
-  corr_matrix <- cor(self$stand_data)
-  self$corr_moy <- mean(abs(corr_matrix[upper.tri(corr_matrix)]))
+  corr_matrix <- cor(self$data)
+  self$corr_moy <- mean(abs(corr_matrix[upper.tri(corr_matrix)])) # Voir si je peux le placer dans le summary ou print car inutile dans calcule.
   #message(" 2. Matrice de corrélation calculée ( corrélation moyenne = ", round(self$corr_moy, 3), ").")
 
 #Etape 3 - Distance basée sur la corrélation (entre chaque variable)
@@ -136,7 +128,7 @@ predict = function(k= NULL, X= NULL) {
 
 
   cl <- cutree(self$hc, k = k)
-  names(cl) <- colnames(self$stand_data)
+  names(cl) <- colnames(self$data)
   self$clusters <- cl
   tableau <- table(cl)
 
@@ -149,33 +141,23 @@ predict = function(k= NULL, X= NULL) {
   for (groupe in unique(cl)){
     var_groupe <- names(cl[cl == groupe])
     if (length(var_groupe) > 1) {
-      acp <- prcomp(self$stand_data[, var_groupe], center = FALSE, scale. = FALSE)
+      acp <- prcomp(self$data[, var_groupe], center = FALSE, scale. = FALSE)
       Zk <- acp$x[, 1]
       self$compo_latent[[as.character(groupe)]] <- list(
         Zk = Zk,
         vars = var_groupe,
-        cor_vals = cor(self$stand_data[, var_groupe, drop = FALSE], Zk)
+        cor_vals = cor(self$data[, var_groupe, drop = FALSE], Zk)
       #message("\nCluster ", groupe, ": composante latente (1er axe ACP)")
       #print(round(cor_vals^2, 3))
       )
     } else {
       self$compo_latent[[as.character(groupe)]] <- list(
-        Zk = self$stand_data[, var_groupe],
+        Zk = self$data[, var_groupe],
         vars = var_groupe,
         cor_vals = 1
       )
     }
   }
-  } else {
-  #  Si les clusters n’existent pas encore, on les crée automatiquement
-    if (is.null(self$clusters)) {
-      if (is.null(self$best_k)) {
-        stop("Aucun cluster existant. Exécutez $fit() puis $predict() sans X d'abord.")
-      } else {
-        cl <- cutree(self$hc, k = self$best_k)
-        names(cl) <- colnames(self$stand_data)
-        self$clusters <- cl
-    }
   }
   if (length(unique(self$clusters)) != length(self$compo_latent)) {
     stop("Incohérence entre les clusters et les composantes latentes. Exécutez $predict() sans X avant.")
@@ -191,16 +173,15 @@ predict = function(k= NULL, X= NULL) {
     stop ("Le jeu contient des valeurs manquantes (NA).")
   }
   #Correlation entre nouvelles et anciennes variable
-  X_stand <- scale(X)
-  self$X_last <- X_stand
+  self$X_last <- X
 
   #Attribution des nouvelles variables
-  nouv_clusters <- rep(NA, ncol(X_stand))
-  names(nouv_clusters) <- colnames(X_stand)
+  nouv_clusters <- rep(NA, ncol(X))
+  names(nouv_clusters) <- colnames(X)
 
   # Boucle sur les nouvelles variables
-  for (j in seq_len(ncol(X_stand))) {
-    var_data <- X_stand[, j]
+  for (j in seq_len(ncol(X))) {
+    var_data <- X[, j]
     cor_latent <- c()
 
     # Boucle sur les clusters existants
@@ -220,7 +201,6 @@ predict = function(k= NULL, X= NULL) {
 
   message("Attribution des nouvelles variables aux clusters existants (méthode Ricco) terminée.")
   print(nouv_clusters)
-}
 },
 
 print = function(...) {
@@ -318,12 +298,12 @@ summary = function(...) {
     cat("Aucune composante latente enregistrée (exécutez $predict() sans X avant).\n")
   }
 
-  # Informations sur les variables illustratives (issues de predict, méthode Ricco) ---
+  # Informations sur les variables illustratives (issues de predict)
   if (!is.null(self$predict_result)) {
-    cat("\n Variables illustratives ajoutées (résultat du predict, méthode Ricco) :\n")
+    cat("\n Variables illustratives ajoutées (résultat du predict) :\n")
     print(self$predict_result)
 
-    # Corrélations des nouvelles variables avec les composantes latentes ---
+    # Corrélations des nouvelles variables avec les composantes latentes
     if (is.null(self$X_last)) {
       cat("\n Impossible d'afficher les corrélations des variables illustratives (X non conservé dans l'objet).\n")
     } else {
@@ -338,11 +318,11 @@ summary = function(...) {
           vars_grp <- names(self$clusters[self$clusters == grp])
 
           if (length(vars_grp) > 1) {
-            acp <- prcomp(self$stand_data[, vars_grp], center = FALSE, scale. = FALSE)
+            acp <- prcomp(self$data[, vars_grp], center = FALSE, scale. = FALSE)
             Zk <- acp$x[, 1]
             cor_latent[as.character(grp)] <- abs(cor(var_data, Zk))
           } else {
-            cor_latent[as.character(grp)] <- abs(cor(var_data, self$stand_data[, vars_grp]))
+            cor_latent[as.character(grp)] <- abs(cor(var_data, self$data[, vars_grp]))
           }
         }
 
@@ -353,7 +333,7 @@ summary = function(...) {
       }
     }
 
-    # Nouvelle répartition complète (avec variables illustratives) ---
+    # Nouvelle répartition complète (avec variables illustratives)
     cat("\n Variables par cluster (avec les variables illustratives ajoutées) :\n")
     all_clusters <- c(self$clusters, self$predict_result)
     for (grp in sort(unique(all_clusters))) {
@@ -365,7 +345,6 @@ summary = function(...) {
   cat("\n──────────────────────────────────────────────\n")
   invisible(self)
 }
-
   )
 )
 
