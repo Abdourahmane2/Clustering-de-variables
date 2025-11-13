@@ -8,5 +8,11 @@ Description: ce package permet de faire le clustering de variables
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true  
-
-
+RoxygenNote: 7.3.3
+Collate: 
+    'CAH.R'
+    'mon_kmeans.R'
+    'clusterVariable.R'
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
