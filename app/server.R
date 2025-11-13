@@ -1,8 +1,13 @@
 library(DT)
 library(readxl)
 library(shiny)
+#importer le package creer dans le dossier R
+library(ClusterVariable)
+
 
 server <- function(input, output, session) {
+  disable("coude")
+  disable("interpreter")
 
   # --- Importation des données ---
   data <- reactive({
@@ -107,18 +112,22 @@ server <- function(input, output, session) {
     )
   })
 
+
   # ==== Statistiques descriptives ====
   output$statistiques_ui <- renderUI({
     req(cleaned_data())
     df <- cleaned_data()
 
     tagList(
-      h4("Statistiques descriptives"),
       DT::datatable(summary(df)),
+
+      hr(),
 
       h4("Dimensions"),
       HTML(paste("Nombre de lignes :", nrow(df), "<br>",
                  "Nombre de colonnes :", ncol(df))),
+
+      hr(),
 
       h4("Types des colonnes"),
       DT::datatable(
@@ -129,8 +138,146 @@ server <- function(input, output, session) {
   })
 
   #========  passer au clustering ===============
+
   observeEvent(input$passer_clustering, {
     req(cleaned_data())
     updateNavbarPage(session, "onglets", selected = "Clustering")
   })
+
+
+#===apercu des donne netoyes dans la page clustering===
+  # tableOutput("tableau_cluster"),
+  output$tableau_cluster <- renderDT({
+    req(cleaned_data())
+    datatable(
+      head(cleaned_data(), 5),
+      options = list(pageLength = 10, scrollX = TRUE),
+      rownames = FALSE
+    )
+  })
+
+
+  #==================================si le user clique sur lancer le clustering==================================
+
+
+  observeEvent(input$lancer, {
+    if (!all(sapply(cleaned_data(), is.numeric)) & input$method == "kmeans") {
+      showNotification("Impossible d'appliquer kmeans : toutes les colonnes doivent être numériques.", type =      "warning")
+
+      return()  # stoppe l'exécution du reste
+    }
+
+    req(cleaned_data())
+    if(input$method == "kmeans"){
+      cluster_quanti <- clusterVariable$new(
+        k = input$k,
+        data = cleaned_data(),
+
+      )
+      cluster_quanti$fit()
+      enable("coude")
+      enable("interpreter")
+
+      output$Résumé <- renderPrint({
+        cluster_quanti$summary()
+      })
+
+    }
+    if(input$method == "CAh"){
+       # Aappel les methode de milena
+    }
+     if(input$method == "ACM"){
+       # Aappel les methode de marvin
+     }
+  })
+
+
+
+
+#=========================si le user clique sur voir coude ==============================
+
+
+  observeEvent(input$coude, {
+    req(cleaned_data())
+    if(input$method == "kmeans"){
+    cluster_quanti <- clusterVariable$new(
+      k = input$k,
+      data = cleaned_data(),
+
+    )
+    cluster_quanti$fit()
+
+    output$afficher_coude<- renderPlot({
+      print(cluster_quanti$tracer_coude())
+  })
+    }
+    if(input$method == "CAh"){
+      # appel les methode de milena
+    }
+     if(input$method == "ACM"){
+       # appel les methode de marvin
+     }
+  })
+
+
+
+
+  #=============================si le user clique sur le bouton resume    =======================
+
+  observeEvent(input$interpreter, {
+    updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")  #rediriger vers la page des resultats
+
+    req(cleaned_data())
+    if(input$method == "kmeans"){
+    cluster_quanti <- clusterVariable$new(
+      k = input$k,
+      data = cleaned_data(),
+
+    )
+    cluster_quanti$fit()
+
+    output$qualite <- renderPrint({
+      indice <- cluster_quanti$indice_silhoute()
+      if (is.factor(indice)) {
+        indice <- as.numeric(as.character(indice))
+      }
+       cat("la valeur de l'indice de silhoutte est :", round(indice, 4))
+    })
+
+    output$pca_plot <- renderPlot({
+      cluster_quanti$visualiser_clusters()
+    })
+
+    "output$heatmap <- renderPlot({
+      cluster_quanti$heatmap_clusters()
+    })"""
+
+
+
+
+    # Afficher le résumé des partitions et autres résultats dans le texte
+    output$summary_output <- renderPrint({
+      results <- cluster_quanti$resume_cluster()
+      cat("=== Nature des partitions ===\n")
+      print(results$partitions)
+      cat("\n=== Distances intra-cluster ===\n")
+      print(results$distances_intra)
+      cat("\n=== Distances inter-cluster ===\n")
+      print(results$dist_inter_cluster)
+    })
+
+
+
+
+    }
+    if(input$method == "CAh"){
+      # appel les methode de milena
+    }
+     if(input$method == "ACM"){
+       # appel les methode de marvin
+     }
+
+    })
+
+
 }

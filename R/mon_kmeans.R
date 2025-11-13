@@ -1,4 +1,5 @@
 #' @keywords internal
+
 mon_kmeans <- function(data, max_iter = 100, k = 3) {
   if(missing(k)) stop("k est obligatoire pour kmeans")
   if (!is.data.frame(data) && !is.matrix(data)) stop("Erreur : 'data' doit être un data.frame ou une matrice.")
@@ -33,8 +34,6 @@ mon_kmeans <- function(data, max_iter = 100, k = 3) {
   return(list(centers = centers, cluster = cluster))
 }
 
-# Exemple
-data <- cbind(c(1,2,1,2,3,6,7,8,9), c(1,1,2,2,3,6,7,8,9))
-res <- mon_kmeans(data, k = 2)
-res$centers
-res$cluster
+
+
+

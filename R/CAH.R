@@ -2,248 +2,253 @@ library (R6)
 
 CAH <- R6Class(
   "CAH",
-  # membres publics
+
   public = list (
-    data = NULL, # Donnée brute
-    X_last = NULL, # Sauvegarde du dernier X
-    method = NULL, # Plus tard methode de ward.D2
-    dist_method = NULL, #methode euclidean
-    acp_true = NULL, # Booléen : ACP utilisé
-    acp = NULL, #Acp utilisé
-    q = NULL, # Nombre axes retenu
-    corr_moy = NULL, #Correlation moyenne entre les variables
-    dist_matrix = NULL, # Matrice de distance
-    hc = NULL, # Object hclust
-    R2_tableau = NULL, #Tbleau de R2
-    best_k = NULL, # k optimal
-    clusters = NULL, # Partition finale
-    predict_result = NULL,
-    nouv_cor = NULL,
-    compo_latent = NULL,
-
-    #Champs
-
-# ---- Constructeur (je dois vérifier si : 1. Le type des données, 2. type des variable données, 3. Constantes, 4. Donnée manquante )-----
-
-initialize = function(data) {
-    if (!is.data.frame(data) && !is.matrix(data)){
-      stop ("CAH : Il n'est pas possible de faire la CAH, les données doivent être sous forme d une dataframe ou une matrice.")
-    }
-  df <- as.data.frame(data)
-# "identifier des groupes d'observation ayant des caractéristiques similaires" (donc au moins 2 individues et 2 variables)
-    if (nrow(df) < 2 || ncol(df) < 2) {
-      stop("CAH: Pas assez de données : Pour faire une CAH il est nécessaire d'avoir au moins 2 individues et 2 variables.")
-    }
-
-# === CAH = 1. mesure de distance. Donc vérification du type de variables (variable numérique)
-  type <- sapply (df, class)
-  #Variable quantivative (numérique)
-  quanti_var <- names(type[type %in% c("numeric", "integer")])
-  #Variable qualitative (strings...)
-  quali_var <- names(type[type %in% c("factor","character", "logical")])
-
-    if (length(quali_var) > 0) {
-      warning(" CAH : Il y a des variables qualitatives dans la dataframe :", paste(quali_var, collapse =", "), ". Elle ne seront pas utilisées pour la CAH.")
-    }
-  #On garde que les variables quantitatives
-  df <- df[, quanti_var, drop = FALSE]
+    data = NULL, # Raw data
+    X_last = NULL, # Last X used in predict
+    method = NULL, # Aggregation method (default: ward.D2)
+    dist_method = "correlation", # Distance method for variable clustering
+    corr_moy = NULL, # Average correlation between variables
+    dist_matrix = NULL, # Distance matrix(dissimularity)
+    hc = NULL, # hclust object
+    best_k = NULL, # Optimal number of clusters
+    clusters = NULL, # Final partition
+    predict_result = NULL, # Prediction results
+    compo_latent = NULL, # Latent components per cluster
 
 
-# === Supression des constantes (exemple si sexe(0,1) si que des 1 alors inutile dans la Df)
-    if (ncol(df) > 0) {
-        variance <- sapply(df, function(x) var(x, na.rm = TRUE))
-        var_zero <- names(variance[variance == 0])
-      if (length(var_zero) > 0) {
-        warning("CAH : On supprime des variables constantes : ", paste(var_zero, collapse = ", "))
-  df <- df[, !(names(df) %in% var_zero), drop = FALSE]
-      }
-    }
-# === Vérification si il y a assez de variables disponible pour faire la CAH
-  if (ncol(df) == 0){
-    stop("CAH : Il n'y a pas de variable quantitative valide disponible pour l'analyse.")
-  }
-
-# === Suppréssion des NA
-  if (anyNA(df)) {
-    warning("CAH : Suppression des lignes comportant des données manquantes")
-    df <- na.omit(df)
-  }
-
-# === Vérification si il y a assez d'individues disponible
-  if (nrow(df) == 0){
-    stop("CAH : Il n'y a pas assez d'individue disponible pour l'analyse.")
-  }
-
-  self$data <- df
-  message("Les données sont chargées ! il y a :", nrow(self$data)," individus et ", ncol(self$data), " variables.")
+    # ---- Constructor ----
+initialize = function(method = "ward.D2") {
+  self$method <- method
+  message ("[CAH] CAH initialized. Please call $fit(data) to fit the model.")
 },
 
-#Calcul du tableau des distances entre individus
-# Chaque individu constitue un groupe (classe)
-#(Définir une mesure de distance entre individus)
-#L’ACP nettoie les données et rend la distance euclidienne plus pertinente.
+# ---- Fit method ----
+fit = function(data) {
+  # Data validation
+  if (!is.data.frame(data) && !is.matrix(data)){
+    stop ("[CAH] It is not possible to perform CAH; the data must be in the form of a dataframe or a matrix.")
+  }
 
-# ---------- FIT -----------
-# 1. Transformer les variables (centrée, réduites), 3. Corrélation et ACP si besion, 4. Matrice des distances, 5. Détection du coude pour trouver k (utilisateur)
+  df <- as.data.frame(data)
 
-fit = function(method = "ward.D2"){
+  # Minimum size check
+  if (nrow(df) < 2 || ncol(df) < 2) {
+    stop("[CAH] Not enough data: To perform a CAH, you need at least 2 individuals and 2 variables.")
+  }
+  # Variable type verification
+  type <- sapply (df, class)
 
-  self$method <- method
+  # - Quantivative variables (numeric)
+  quanti_var <- names(type[type %in% c("numeric", "integer")])
+  # - Qualitative variables (strings...)
+  quali_var <- names(type[type %in% c("factor","character", "logical")])
 
+  if (length(quali_var) > 0) {
+    warning(" [CAH] There are qualitative variables in the dataframe:", paste(quali_var, collapse =", "), ". They will not be used for CAH.")
+  }
+  #We only keep quantitative variables
+  df <- df[, quanti_var, drop = FALSE]
+
+  # Remove constant variables (variance = 0 or NA)
+  if (ncol(df) > 0) {
+    variance <- sapply(df, function(x) var(x, na.rm = TRUE))
+    var_zero <- names(variance[variance == 0])
+    if (length(var_zero) > 0) {
+      warning("[CAH] Constant variables are removed: ", paste(var_zero, collapse = ", "))
+      df <- df[, !(names(df) %in% var_zero), drop = FALSE]
+    }
+  }
+
+  # Check remaining variables
+  if (ncol(df) == 0){
+    stop("[CAH] There are no valid quantitative variables available for analysis.")
+  }
+  # Remove missing values
+  if (anyNA(df)) {
+    warning("[CAH] Removal of lines containing missing data")
+    df <- na.omit(df)
+  }
+  # Check remaining individuals
+  if (nrow(df) == 0){
+    stop("[CAH] There are not enough individuals available for analysis.")
+  }
+  self$data <- df
+  message("[CAH] The data is loaded ! There are :", nrow(self$data)," individuals and ", ncol(self$data), " variables.")
+
+
+  # Correlation matrix (on raw data - correlation is scale-invariant)
   corr_matrix <- cor(self$data)
   self$corr_moy <- mean(abs(corr_matrix[upper.tri(corr_matrix)])) # Voir si je peux le placer dans le summary ou print car inutile dans calcule.
-  #message(" 2. Matrice de corrélation calculée ( corrélation moyenne = ", round(self$corr_moy, 3), ").")
+  #message("[CAH] Calculated correlation matrix (average correlation = ", round(self$corr_moy, 3), ").")
 
-#Etape 3 - Distance basée sur la corrélation (entre chaque variable)
+  # Distance matrix based on correlation
   self$dist_matrix <- as.dist(sqrt(2 * (1 - abs(corr_matrix))))
-  #message("Matrice de distance créée entre variables (corrélationnelle).")
+  #message("[CAH] Distance matrix created between variables (correlational).")
 
+  # Hierarchical clustering
+  self$hc <- hclust(self$dist_matrix, method = self$method)
+  #message("[CAH] is performed using the method = ", method, ".")
 
-# Etape 4 - Construction de la CAH
-  self$hc <- hclust(self$dist_matrix, method = method)
-  #message("CAH est effectuée avec la méthode = ", method, ".")
-
-  # Etape 5 - Detection du coude pour trouver k (nombre optimal de classe avec la méthode du coude)
-
+  # Detect optimal k using elbow method
   h <- self$hc$height
   d1 <- diff(h)
   d2 <- diff(d1)
   idx <- which.min(d2) + 1
   self$best_k <- idx
-  #message("Le nombre idéal de classes détécté est : k = ", self$best_k)
+  #message("[CAH] The ideal number of classes detected is: k =", self$best_k)
 
   invisible(self)
+
 },
 
-#Predict CAH classique ( Voir Cours)
-predict = function(k= NULL, X= NULL) {
-  if (is.null(self$hc))
-    stop("Merci de bien vouloir passer par le $fit() avant.")
-
-  #Si on a pas une nouvelle variable X.
-  if (is.null(X)) {
-    if (is.null(k)){
-      k <- self$best_k
-    }
-
-
-  cl <- cutree(self$hc, k = k)
+# ---- Cut tree method ----
+cutree = function(k=NULL) {
+  if (is.null(self$hc)){
+    stop("[CAH] : Call $fit() first.")
+  }
+  if (is.null(k)){
+    k<- self$best_k
+  }
+  cl <- cutree(self$hc, k=k)
   names(cl) <- colnames(self$data)
-  self$clusters <- cl
-  tableau <- table(cl)
 
+  self$clusters <- cl
+
+  # Compute latent components for each cluster (PCA)
   self$compo_latent <- list()
 
-  #message("CAH : Répartition des variables par groupe :")
-  #print(tableau)
-
-  #ACP pour calculer la composante latente (interprétation)
   for (groupe in unique(cl)){
     var_groupe <- names(cl[cl == groupe])
+
     if (length(var_groupe) > 1) {
-      acp <- prcomp(self$data[, var_groupe], center = FALSE, scale. = FALSE)
+      #LOCAL STANDARDIZATION for PCA
+      data_groupe_scaled <- scale(self$data[, var_groupe])
+
+      acp <- prcomp(data_groupe_scaled, center = FALSE, scale. = FALSE)
       Zk <- acp$x[, 1]
+
+      # Correlations with standardized data
+      cor_vals <- cor(data_groupe_scaled, Zk)
+
       self$compo_latent[[as.character(groupe)]] <- list(
         Zk = Zk,
         vars = var_groupe,
-        cor_vals = cor(self$data[, var_groupe, drop = FALSE], Zk)
-      #message("\nCluster ", groupe, ": composante latente (1er axe ACP)")
-      #print(round(cor_vals^2, 3))
+        cor_vals = cor_vals,
+        scaled_data = data_groupe_scaled # Save for the predict()
+        #message("\nCluster, "group": latent component (1st PCA axis)")
+        #print(round(cor_vals^2, 3))
       )
     } else {
+      # Single variable: standardize it too
+      data_scaled <- scale(self$data[, var_groupe])
+
       self$compo_latent[[as.character(groupe)]] <- list(
-        Zk = self$data[, var_groupe],
+        Zk = as.vector(data_scaled),
         vars = var_groupe,
-        cor_vals = 1
+        cor_vals = 1,
+        scaled_data = data_scaled
       )
     }
   }
-  }
-  if (length(unique(self$clusters)) != length(self$compo_latent)) {
-    stop("Incohérence entre les clusters et les composantes latentes. Exécutez $predict() sans X avant.")
-  }
 
-  X <- as.data.frame(X)
+  message("Partitioning completed: ", k, " clusters and calculated latent components. ")
+  return(cl)
+},
 
-  # Etape 1 : Vérification de X
+#---- Predict method ----
+predict = function(X_new) {
+  if (is.null(self$clusters)){
+    stop("[CAH] first call $cutree().")
+  }
+  if (is.null(self$compo_latent)){
+    stop("[CAH] Missing latent components (internal error).")
+  }
+  X <- as.data.frame(X_new)
+
+  # Step 1 : Validation
   if (nrow(X) != nrow(self$data)) {
-    stop("Le nombre d'individus doit être identique à celui de notre dataframe de base.")
+    stop("The number of individuals must be identical to that in our base dataframe.")
   }
   if (anyNA(X)) {
-    stop ("Le jeu contient des valeurs manquantes (NA).")
+    stop ("The game contains missing values (NA).")
   }
-  #Correlation entre nouvelles et anciennes variable
+
   self$X_last <- X
 
-  #Attribution des nouvelles variables
+  # Assign new variables to cluster
   nouv_clusters <- rep(NA, ncol(X))
   names(nouv_clusters) <- colnames(X)
 
-  # Boucle sur les nouvelles variables
+
   for (j in seq_len(ncol(X))) {
-    var_data <- X[, j]
+    # STANDARDIZE the new variable
+    var_data_scaled <- scale(X[, j])
     cor_latent <- c()
 
-    # Boucle sur les clusters existants
+    # Compute correlation with each cluster's latent component
     for (groupe in unique(self$clusters)) {
       Zk <- self$compo_latent[[as.character(groupe)]]$Zk
-      cor_latent[as.character(groupe)] <- abs(cor(var_data, Zk))
+      cor_latent[as.character(groupe)] <- abs(cor(var_data_scaled, Zk))
+
     }
 
-    # Rattachement : cluster avec la plus forte corrélation absolue
+    # Assign to cluster with highest correlation
     best_cluster <- as.numeric(names(which.max(cor_latent)))
     nouv_clusters[j] <- best_cluster
   }
 
-  # Enregistrement des résultats
+  # Save the result
   self$predict_result <- nouv_clusters
-  self$nouv_cor <- NULL  # plus utilisée dans cette version
 
-  message("Attribution des nouvelles variables aux clusters existants (méthode Ricco) terminée.")
+  message("[CAH] Assignment of new variables to existing clusters completed.")
   print(nouv_clusters)
+
+  invisible(self)
+
 },
 
 print = function(...) {
   cat("\n──────────────────────────────────────────────\n")
-  cat("   Modèle de Classification Hiérarchique (CAH)\n")
+  cat("    Hierarchical Clustering on Variables (HCA)\n")
   cat("──────────────────────────────────────────────\n")
 
-  # Vérification des données
+  # Checking the data
   if (is.null(self$data)) {
-    cat("⚠️  Aucun jeu de données chargé.\n")
-    cat("Veuillez exécuter :  $initialize(data)\n")
+    cat(" No data loaded.\n")
+    cat("Call $fit(data) to load and fit the model.\n")
     return(invisible(self))
   }
 
-  # Informations générales sur les données
-  cat(" Données : ", nrow(self$data), " individus × ", ncol(self$data), " variables\n", sep = "")
-  cat(" Méthode d’agrégation :", ifelse(is.null(self$method), "non spécifiée", self$method), "\n")
-  cat(" Méthode de distance :", ifelse(is.null(self$dist_method), "corrélation", self$dist_method), "\n")
+  # General informations
+  cat(" Data: ", nrow(self$data), " individuals × ", ncol(self$data), " variables\n", sep = "")
+  cat(" Aggregation method: ", ifelse(is.null(self$method), "non spécifiée", self$method), "\n")
+  cat(" Distance method:", ifelse(is.null(self$dist_method), "corrélation", self$dist_method), "\n")
 
-  # Corrélation moyenne
+  # Correlation
   if (!is.null(self$corr_moy)) {
-    cat(" Corrélation moyenne entre variables :", round(self$corr_moy, 3), "\n")
+    cat(" Average correlation:", round(self$corr_moy, 3), "\n")
   }
 
   # Nombre optimal de clusters
   if (!is.null(self$best_k)) {
-    cat(" Nombre optimal de clusters détecté :", self$best_k, "\n")
+    cat(" Optimal k detected :", self$best_k, "\n")
   } else {
-    cat(" Nombre optimal de clusters : non déterminé (exécutez $fit())\n")
+    cat(" Optimal k: not determined (call $fit())\n")
   }
 
-  # Répartition des variables par cluster
+  # Preparation of the clusters
   if (!is.null(self$clusters)) {
     tb <- table(self$clusters)
-    cat(" Répartition des variables par cluster :\n")
+    cat(" Variables per cluster:\n")
     print(tb)
   } else {
-    cat(" Répartition des variables : non encore effectuée (exécutez $predict())\n")
+    cat(" Partitioning: not done (call $cutree())\n")
   }
 
-  # Variables illustratives ajoutées (via predict)
+  # Illustrative variables added (via predict)
   if (!is.null(self$predict_result)) {
-    cat(" Variables illustratives ajoutées :", length(self$predict_result), "\n")
+    cat("Supplementary variables added: ", length(self$predict_result), "\n")
   }
 
   cat("──────────────────────────────────────────────\n\n")
@@ -253,69 +258,77 @@ print = function(...) {
 
 summary = function(...) {
   cat("\n──────────────────────────────────────────────\n")
-  cat("   Résumé détaillé du modèle CAH : \n")
+  cat("   HCA Model - Detailed Summary\n")
   cat("──────────────────────────────────────────────\n")
-  # Vérification que la CAH a été effectuée
+
+  # First Check
   if (is.null(self$hc)) {
-    cat("Aucun modèle ajusté. Veuillez exécuter $fit() d’abord.")
+    cat("No model fitted. Call $fit(data) first.")
     return(invisible(NULL))
   }
 
-  # Informations générales
-  cat("- Méthode d’agrégation :", self$method, "\n")
-  cat("- Corrélation moyenne :", round(self$corr_moy, 3), "\n")
-  cat("- Nombre optimal de clusters :", self$best_k, "\n\n")
+  # General information
+  cat("• Aggregation method: ", self$method, "\n")
+  cat("• Average correlation: ", round(self$corr_moy, 3), "\n")
+  cat("• Optimal k: ", self$best_k, "\n\n")
 
-  # Répartition des clusters de base
-  cat("Répartition des variables actives par groupe :\n")
-  print(table(self$clusters))
-
-  # Liste des variables par cluster
-  cat("\n Variables par cluster :\n")
-  for (grp in unique(self$clusters)) {
-    vars <- names(self$clusters[self$clusters == grp])
-    cat("  -> Cluster", grp, "(", length(vars), "variables) :", paste(vars, collapse = ", "), "\n")
+  if (is.null(self$clusters)) {
+    cat(" No partitioning done. Call $cutree() first.\n")
+    return(invisible(NULL))
   }
 
-  # ACP locale sur chaque cluster (analyse d'interprétation)
-  cat("\n Analyse factorielle (ACP interne à chaque cluster) :\n")
-    if (!is.null(self$compo_latent)) {
-      for (grp in names(self$compo_latent)) {
-        compo <- self$compo_latent[[grp]]
+  # Distribution of clusters
+  cat("Distribution of active variables:\n")
+  print(table(self$clusters))
 
-      cat("\nCluster", grp, ":\n")
+  # List of variables per cluster
+  cat("\n Variables per cluster:\n")
+  for (grp in unique(self$clusters)) {
+    vars_grp <- names(self$clusters[self$clusters == grp])
+    cat("  -> Cluster", grp, "(", length(vars_grp), "variables) :", paste(vars_grp, collapse = ", "), "\n")
+
+  }
+
+  # Local PCA on each cluster (interpretation analysis)
+  cat("\nLocal PCA (standardized within each cluster):\n")
+    if (!is.null(self$compo_latent)) {
+      for (group in names(self$compo_latent)) {
+        compo <- self$compo_latent[[group]]
+
+      cat("\n Cluster", group, ":\n")
+
       if (length(compo$vars) > 1 && !is.null(compo$cor_vals)) {
         cor_vec <- as.numeric(compo$cor_vals)
         names(cor_vec) <- compo$vars
+        cat("  Squared correlations with latent component:\n")
         print(round(cor_vec^2, 3))
         best_var <- names(which.max(cor_vec^2))
-        cat("-> Variable parangon :", best_var, "\n")
+        cat("-> Representative variable (parangon) :", best_var, "\n")
       } else {
-        cat("Une seule variable :", compo$vars, "(pas d’ACP nécessaire)\n")
+        cat(" Single variable: ", compo$vars, "\n", sep = "")
       }
     }
-  } else {
-    cat("Aucune composante latente enregistrée (exécutez $predict() sans X avant).\n")
   }
 
-  # Informations sur les variables illustratives (issues de predict)
+  # Information on illustrative variables (from predict)
   if (!is.null(self$predict_result)) {
-    cat("\n Variables illustratives ajoutées (résultat du predict) :\n")
+    cat("\n──────────────────────────────────────────────\n")
+    cat("Supplementary variables:\n")
     print(self$predict_result)
 
-    # Corrélations des nouvelles variables avec les composantes latentes
+    # Correlations between new variables and latent components
     if (is.null(self$X_last)) {
-      cat("\n Impossible d'afficher les corrélations des variables illustratives (X non conservé dans l'objet).\n")
+      cat("\n Unable to display correlations for illustrative variables (X not retained in the object).\n")
     } else {
-      cat("\n Corrélations |r(X_j, Z_k)| des nouvelles variables avec chaque cluster :\n")
+      cat("\n Correlations |r(X_j, Z_k)| of the new variables with each cluster:\n")
 
       nouv_vars <- names(self$predict_result)
       for (v in nouv_vars) {
         var_data <- self$X_last[, v]
         cor_latent <- c()
 
-        for (grp in unique(self$clusters)) {
-          vars_grp <- names(self$clusters[self$clusters == grp])
+        for (group in unique(self$clusters)) {
+          vars_group <- names(self$clusters[self$clusters == grp])
 
           if (length(vars_grp) > 1) {
             acp <- prcomp(self$data[, vars_grp], center = FALSE, scale. = FALSE)
@@ -333,8 +346,8 @@ summary = function(...) {
       }
     }
 
-    # Nouvelle répartition complète (avec variables illustratives)
-    cat("\n Variables par cluster (avec les variables illustratives ajoutées) :\n")
+    # New complete distribution (with illustrative variables)
+    cat("\nComplete partition (active + supplementary):\n")
     all_clusters <- c(self$clusters, self$predict_result)
     for (grp in sort(unique(all_clusters))) {
       vars <- names(all_clusters[all_clusters == grp])
