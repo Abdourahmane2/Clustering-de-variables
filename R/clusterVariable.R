@@ -16,8 +16,6 @@
 #' cv$summary()
 #' cv$plot_elbow(k_max = 6)
 #' cv$plot_silhouette()
-#'
-library(ggplot2)
 clusterVariable <- R6::R6Class(
   "clusterVariable",
 
@@ -410,35 +408,44 @@ plot_elbow = function(k_max = 10) {
     #' Generate a comprehensive report of clustering quality.
     #'
     #' @return A list with detailed statistics.
-    cluster_quality_report = function() {
-      if (is.null(self$cluster_result)) {
-        stop("Error: Model not fitted yet. Run fit() first.")
-      }
+cluster_quality_report = function() {
+  if (is.null(self$cluster_result)) {
+    stop("Error: Model not fitted yet. Run fit() first.")
+  }
 
-      report <- list(
-        summary = paste("Clustering réalisé avec k =", self$k, "clusters sur",
-                        ncol(self$data), "variables."),
+  report <- list(
+    summary = paste("Clustering réalisé avec k =", self$k, "clusters sur",
+                    ncol(self$data), "variables."),
 
-        overall_quality = paste("Silhouette globale :",
-                                round(private$overall_silhouette, 3),
-                                "-",
-                                ifelse(private$overall_silhouette >= 0.7, "Excellente structure",
-                                       ifelse(private$overall_silhouette >= 0.5, "Structure raisonnable",
-                                              ifelse(private$overall_silhouette >= 0.25, "Structure faible",
-                                                     "Pas de structure substantielle")))),
-        overall_silhouette = private$overall_silhouette,
-        cluster_sizes = table(self$cluster_result$cluster),
-        cluster_silhouettes = tapply(private$variable_silhouettes,
-                                     self$cluster_result$cluster,
-                                     mean),
-        paste("les variables mal classées (silhouette < 0.5) sont :",
-              paste(names(self$data)[private$variable_silhouettes < 0.5], collapse = ", ")),
-        paste("les variables bien classées (silhouette >= 0.5) sont :",
-              paste(names(self$data)[private$variable_silhouettes >= 0.5], collapse = ", "))
-      )
+    overall_quality = paste("Silhouette globale :",
+                            round(private$overall_silhouette, 3),
+                            "-",
+                            ifelse(private$overall_silhouette >= 0.7, "Excellente structure",
+                                   ifelse(private$overall_silhouette >= 0.5, "Structure raisonnable",
+                                          ifelse(private$overall_silhouette >= 0.25, "Structure faible",
+                                                 "Pas de structure substantielle")))),
 
-      return(report)
-    }
+    overall_silhouette = private$overall_silhouette,
+
+    cluster_sizes = table(self$cluster_result$cluster),
+
+    cluster_silhouettes = tapply(private$variable_silhouettes,
+                                 self$cluster_result$cluster,
+                                 mean),
+
+    poorly_classified = if(length(names(self$data)[private$variable_silhouettes < 0.5]) > 0) {
+      paste("Variables mal classées (silhouette < 0.5) :",
+            paste(names(self$data)[private$variable_silhouettes < 0.5], collapse = ", "))
+    } else {
+      "Aucune variable mal classée."
+    },
+
+    well_classified = paste("Variables bien classées (silhouette >= 0.5) :",
+                            paste(names(self$data)[private$variable_silhouettes >= 0.5], collapse = ", "))
+  )
+
+  return(report)
+}
   ),
 
   #======================== Private Methods ========================
