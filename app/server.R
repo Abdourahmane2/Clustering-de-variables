@@ -164,6 +164,16 @@ server <- function(input, output, session) {
     if (!all(sapply(cleaned_data(), is.numeric)) & input$method == "kmeans") {
       showNotification("Impossible d'appliquer kmeans : toutes les colonnes doivent être numériques.", type =      "warning")
 
+      #si les donnes comporte des valeurs manquantes
+      if (any(is.na(cleaned_data()))) {
+        showNotification("Veuillez nettoyer les données avant de lancer le clustering.", type = "warning")
+      }
+
+      #si k est inferieur a 2
+      if (input$k < 2) {
+        showNotification("Le nombre de clusters k doit être au moins égal à 2 pour kmeans.", type = "warning")
+      }
+
       return()  # stoppe l'exécution du reste
     }
 
@@ -171,10 +181,9 @@ server <- function(input, output, session) {
     if(input$method == "kmeans"){
       cluster_quanti <- clusterVariable$new(
         k = input$k,
-        data = cleaned_data(),
-
-      )
-      cluster_quanti$fit()
+        auto_clean = TRUE
+ )
+      cluster_quanti$fit(cleaned_data())
       enable("coude")
       enable("interpreter")
 
@@ -201,14 +210,13 @@ server <- function(input, output, session) {
     req(cleaned_data())
     if(input$method == "kmeans"){
     cluster_quanti <- clusterVariable$new(
-      k = input$k,
-      data = cleaned_data(),
-
+      k = input$k ,
+      auto_clean = TRUE
     )
-    cluster_quanti$fit()
+    cluster_quanti$fit(cleaned_data())
 
     output$afficher_coude<- renderPlot({
-      print(cluster_quanti$tracer_coude())
+      print(cluster_quanti$plot_elbow())
   })
     }
     if(input$method == "CAh"){
@@ -231,40 +239,23 @@ server <- function(input, output, session) {
     if(input$method == "kmeans"){
     cluster_quanti <- clusterVariable$new(
       k = input$k,
-      data = cleaned_data(),
+      auto_clean = TRUE
 
     )
-    cluster_quanti$fit()
+    cluster_quanti$fit(cleaned_data())
 
     output$qualite <- renderPrint({
-      indice <- cluster_quanti$indice_silhoute()
-      if (is.factor(indice)) {
-        indice <- as.numeric(as.character(indice))
-      }
-       cat("la valeur de l'indice de silhoutte est :", round(indice, 4))
+      cluster_quanti$cluster_quality_report()
     })
 
     output$pca_plot <- renderPlot({
-      cluster_quanti$visualiser_clusters()
+      cluster_quanti$plot_clusters()
     })
 
-    "output$heatmap <- renderPlot({
-      cluster_quanti$heatmap_clusters()
-    })"""
-
-
-
-
-    # Afficher le résumé des partitions et autres résultats dans le texte
-    output$summary_output <- renderPrint({
-      results <- cluster_quanti$resume_cluster()
-      cat("=== Nature des partitions ===\n")
-      print(results$partitions)
-      cat("\n=== Distances intra-cluster ===\n")
-      print(results$distances_intra)
-      cat("\n=== Distances inter-cluster ===\n")
-      print(results$dist_inter_cluster)
+    output$heatmap <- renderPlot({
+      cluster_quanti$plot_heatmap()
     })
+
 
 
 

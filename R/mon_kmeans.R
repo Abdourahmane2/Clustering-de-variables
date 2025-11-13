@@ -1,39 +1,54 @@
-#' @keywords internal
+mon_kmeans <- function(donnees, k, max_iter = 100) {
 
-mon_kmeans <- function(data, max_iter = 100, k = 3) {
-  if(missing(k)) stop("k est obligatoire pour kmeans")
-  if (!is.data.frame(data) && !is.matrix(data)) stop("Erreur : 'data' doit être un data.frame ou une matrice.")
+  if (missing(k)) stop("Erreur : k est obligatoire")
+  if (!is.data.frame(donnees) && !is.matrix(donnees)) stop("Erreur : donnees doit être un data.frame ou une matrice")
 
-  data_t <- t(data)
-  n_vars <- nrow(data_t)
-  n_features <- ncol(data_t)
+  # Transposer : variables → lignes
+  donnees_t <- t(as.matrix(donnees))
+  nb_variables <- nrow(donnees_t)
+  nb_observations <- ncol(donnees_t)
 
-  centers <- data_t[sample(1:n_vars, k), , drop = FALSE]
+  if (k > nb_variables) stop(paste("k =", k, "est trop grand. Maximum :", nb_variables))
 
-  for (iter in 1:max_iter) {
-    distances <- matrix(NA, nrow = k, ncol = n_vars)
+  set.seed(123)
+  indices_initiaux <- sample(1:nb_variables, k)
+  centres <- donnees_t[indices_initiaux, , drop = FALSE]
+
+  for (iteration in 1:max_iter) {
+    # --- Affectation ---
+    distances <- matrix(0, nrow = k, ncol = nb_variables)
     for (i in 1:k) {
-      distances[i, ] <- rowSums((data_t - matrix(centers[i, ], nrow = n_vars, ncol = n_features, byrow = TRUE))^2)
+      for (j in 1:nb_variables) {
+        distances[i, j] <- sum((donnees_t[j, ] - centres[i, ])^2)
+      }
     }
 
     cluster <- apply(distances, 2, which.min)
 
-    new_centers <- matrix(NA, nrow = k, ncol = n_features)
+    # --- Mise à jour des centres ---
+    anciens_centres <- centres
     for (i in 1:k) {
-      if (sum(cluster == i) > 0) {
-        new_centers[i, ] <- colMeans(data_t[cluster == i, , drop = FALSE])
+      vars_cluster <- which(cluster == i)
+      if (length(vars_cluster) > 0) {
+        centres[i, ] <- colMeans(donnees_t[vars_cluster, , drop = FALSE])
       } else {
-        new_centers[i, ] <- centers[i, ]
+        # Cluster vide → garder ancien centre
+        centres[i, ] <- anciens_centres[i, ]
       }
     }
 
-    if (all(centers == new_centers, na.rm = TRUE)) break
-    centers <- new_centers
+    # Convergence
+    if (all(centres == anciens_centres)) break
   }
 
-  return(list(centers = centers, cluster = cluster))
+  # Assurer une matrice même si k = 1
+  if (k == 1) centres <- matrix(centres, nrow = 1)
+
+  rownames(centres) <- paste0("Cluster", 1:k)
+  names(cluster) <- colnames(donnees)
+
+  return(list(
+    centers = centres,
+    cluster = cluster
+  ))
 }
-
-
-
-

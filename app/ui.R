@@ -148,8 +148,6 @@ ui <- navbarPage(
                   # Onglet 2 : Visualisations
                   tabPanel("Visualisations",
                            br() ,
-
-                           h4("Visualisations du Clustering avec la fonction fviz_cluster"),
                            plotOutput("pca_plot"),
                            br() ,
                            h5("heatmap des centres de clusters"),
@@ -163,8 +161,8 @@ ui <- navbarPage(
                            br() ,
                            h4("Résumé détaillé du clustering"),
                            br() ,
-                           verbatimTextOutput("summary_output"),  # Résumé des clusters
-                           plotOutput("cluster_plot")  # Visualisation graphique des clusters
+                           verbatimTextOutput("resume_resultat"),  # Résumé des clusters
+
 
                   )
       )
