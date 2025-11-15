@@ -2,30 +2,29 @@
 % Please edit documentation in R/clusterVariable.R
 \name{clusterVariable}
 \alias{clusterVariable}
-\title{R6 Class for Variable Clustering using K-means}
+\title{The \code{clusterVariable} R6 class performs clustering on variables (columns) of a dataset
+using a custom implementation of the K-means algorithm (\code{mon_kmeans}).
+It supports automatic data cleaning, visualization, prediction for new data,
+and quality evaluation via silhouette scores.}
 \description{
-R6 Class for Variable Clustering using K-means
-
-R6 Class for Variable Clustering using K-means
-}
-\details{
-The `clusterVariable` R6 class performs clustering on variables (columns) of a dataset
-using a custom implementation of the K-means algorithm (`mon_kmeans`).
+The \code{clusterVariable} R6 class performs clustering on variables (columns) of a dataset
+using a custom implementation of the K-means algorithm (\code{mon_kmeans}).
 It supports automatic data cleaning, visualization, prediction for new data,
 and quality evaluation via silhouette scores.
 
-
-The method assumes all variables are numeric. It calls the internal
-`mon_kmeans()` function to compute clusters.
+The \code{clusterVariable} R6 class performs clustering on variables (columns) of a dataset
+using a custom implementation of the K-means algorithm (\code{mon_kmeans}).
+It supports automatic data cleaning, visualization, prediction for new data,
+and quality evaluation via silhouette scores.
 }
 \examples{
 data(iris)
 cv <- clusterVariable$new(k = 3, data = iris[, 1:4], donnee_nettoyee = TRUE)
 cv$fit()
 cv$summary()
-cv$heatmap_clusters()
 cv$tracer_coude(k_max = 6)
 cv$indice_silhoute()
+
 }
 \section{Public fields}{
 \if{html}{\out{<div class="r6-fields">}}
@@ -45,7 +44,6 @@ cv$indice_silhoute()
 \item \href{#method-clusterVariable-fit}{\code{clusterVariable$fit()}}
 \item \href{#method-clusterVariable-predict}{\code{clusterVariable$predict()}}
 \item \href{#method-clusterVariable-summary}{\code{clusterVariable$summary()}}
-\item \href{#method-clusterVariable-heatmap_clusters}{\code{clusterVariable$heatmap_clusters()}}
 \item \href{#method-clusterVariable-visualiser_clusters}{\code{clusterVariable$visualiser_clusters()}}
 \item \href{#method-clusterVariable-tracer_coude}{\code{clusterVariable$tracer_coude()}}
 \item \href{#method-clusterVariable-resume_cluster}{\code{clusterVariable$resume_cluster()}}
@@ -58,7 +56,7 @@ cv$indice_silhoute()
 \if{html}{\out{<a id="method-clusterVariable-new"></a>}}
 \if{latex}{\out{\hypertarget{method-clusterVariable-new}{}}}
 \subsection{Method \code{new()}}{
-Create a new `clusterVariable` object.
+Create a new \code{clusterVariable} object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{clusterVariable$new(k = 3, data = NULL, donnee_nettoyee = FALSE)}\if{html}{\out{</div>}}
 }
@@ -75,7 +73,7 @@ Create a new `clusterVariable` object.
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-A new `clusterVariable` object.
+A new \code{clusterVariable} object.
 }
 }
 \if{html}{\out{<hr>}}
@@ -87,8 +85,13 @@ Fit the K-means clustering model on the provided dataset.
 \if{html}{\out{<div class="r">}}\preformatted{clusterVariable$fit()}\if{html}{\out{</div>}}
 }
 
+\subsection{Details}{
+The method assumes all variables are numeric. It calls the internal
+\code{mon_kmeans()} function to compute clusters.
+}
+
 \subsection{Returns}{
-Updates the `resultat_cluster` field with cluster assignments and centers.
+Updates the \code{resultat_cluster} field with cluster assignments and centers.
 }
 }
 \if{html}{\out{<hr>}}
@@ -108,7 +111,7 @@ Predict cluster assignments for new data based on existing cluster centers.
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-A new `clusterVariable` objectcontaining the predicted clusters.
+A new \code{clusterVariable} object containing the predicted clusters.
 }
 }
 \if{html}{\out{<hr>}}
@@ -126,23 +129,10 @@ and the list of variables assigned to each.
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-clusterVariable-heatmap_clusters"></a>}}
-\if{latex}{\out{\hypertarget{method-clusterVariable-heatmap_clusters}{}}}
-\subsection{Method \code{heatmap_clusters()}}{
-Plot a heatmap of the cluster centers.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$heatmap_clusters()}\if{html}{\out{</div>}}
-}
-
-\subsection{Returns}{
-A heatmap visualization using `pheatmap`.
-}
-}
-\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-clusterVariable-visualiser_clusters"></a>}}
 \if{latex}{\out{\hypertarget{method-clusterVariable-visualiser_clusters}{}}}
 \subsection{Method \code{visualiser_clusters()}}{
-Visualize the clusters using `factoextra::fviz_cluster`.
+Visualize the clusters using \code{factoextra::fviz_cluster}.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{clusterVariable$visualiser_clusters()}\if{html}{\out{</div>}}
 }
