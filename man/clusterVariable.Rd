@@ -2,38 +2,34 @@
 % Please edit documentation in R/clusterVariable.R
 \name{clusterVariable}
 \alias{clusterVariable}
-\title{The \code{clusterVariable} R6 class performs clustering on variables (columns) of a dataset
-using a custom implementation of the K-means algorithm (\code{mon_kmeans}).
-It supports automatic data cleaning, visualization, prediction for new data,
-and quality evaluation via silhouette scores.}
+\title{Variable Clustering using K-means Algorithm}
 \description{
-The \code{clusterVariable} R6 class performs clustering on variables (columns) of a dataset
-using a custom implementation of the K-means algorithm (\code{mon_kmeans}).
-It supports automatic data cleaning, visualization, prediction for new data,
-and quality evaluation via silhouette scores.
+Variable Clustering using K-means Algorithm
 
-The \code{clusterVariable} R6 class performs clustering on variables (columns) of a dataset
-using a custom implementation of the K-means algorithm (\code{mon_kmeans}).
+Variable Clustering using K-means Algorithm
+}
+\details{
+The `clusterVariable` R6 class performs clustering on variables (columns) of a dataset
+using a custom implementation of the K-means algorithm (`mon_kmeans`).
 It supports automatic data cleaning, visualization, prediction for new data,
 and quality evaluation via silhouette scores.
 }
 \examples{
 data(iris)
-cv <- clusterVariable$new(k = 3, data = iris[, 1:4], donnee_nettoyee = TRUE)
-cv$fit()
+cv <- clusterVariable$new(k = 3)
+cv$fit(iris[, 1:4])
 cv$summary()
-cv$tracer_coude(k_max = 6)
-cv$indice_silhoute()
-
+cv$plot_elbow(k_max = 6)
+cv$plot_silhouette()
 }
 \section{Public fields}{
 \if{html}{\out{<div class="r6-fields">}}
 \describe{
 \item{\code{k}}{Number of clusters to create}
 
-\item{\code{data}}{The dataset used for clustering}
+\item{\code{data}}{The dataset used for clustering (stored after fit)}
 
-\item{\code{resultat_cluster}}{Results of the clustering process}
+\item{\code{cluster_result}}{Results of the clustering process}
 }
 \if{html}{\out{</div>}}
 }
@@ -44,11 +40,13 @@ cv$indice_silhoute()
 \item \href{#method-clusterVariable-fit}{\code{clusterVariable$fit()}}
 \item \href{#method-clusterVariable-predict}{\code{clusterVariable$predict()}}
 \item \href{#method-clusterVariable-summary}{\code{clusterVariable$summary()}}
-\item \href{#method-clusterVariable-visualiser_clusters}{\code{clusterVariable$visualiser_clusters()}}
-\item \href{#method-clusterVariable-tracer_coude}{\code{clusterVariable$tracer_coude()}}
-\item \href{#method-clusterVariable-resume_cluster}{\code{clusterVariable$resume_cluster()}}
-\item \href{#method-clusterVariable-indice_silhoute}{\code{clusterVariable$indice_silhoute()}}
 \item \href{#method-clusterVariable-print}{\code{clusterVariable$print()}}
+\item \href{#method-clusterVariable-plot_clusters}{\code{clusterVariable$plot_clusters()}}
+\item \href{#method-clusterVariable-plot_elbow}{\code{clusterVariable$plot_elbow()}}
+\item \href{#method-clusterVariable-plot_heatmap}{\code{clusterVariable$plot_heatmap()}}
+\item \href{#method-clusterVariable-get_variable_silhouettes}{\code{clusterVariable$get_variable_silhouettes()}}
+\item \href{#method-clusterVariable-get_silhouette_score}{\code{clusterVariable$get_silhouette_score()}}
+\item \href{#method-clusterVariable-cluster_quality_report}{\code{clusterVariable$cluster_quality_report()}}
 \item \href{#method-clusterVariable-clone}{\code{clusterVariable$clone()}}
 }
 }
@@ -56,9 +54,9 @@ cv$indice_silhoute()
 \if{html}{\out{<a id="method-clusterVariable-new"></a>}}
 \if{latex}{\out{\hypertarget{method-clusterVariable-new}{}}}
 \subsection{Method \code{new()}}{
-Create a new \code{clusterVariable} object.
+Create a new `clusterVariable` object.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$new(k = 3, data = NULL, donnee_nettoyee = FALSE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$new(k = 3, max_iter = 100, auto_clean = TRUE)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -66,14 +64,14 @@ Create a new \code{clusterVariable} object.
 \describe{
 \item{\code{k}}{Integer. Number of clusters to form (default = 3).}
 
-\item{\code{data}}{A numeric data frame containing variables to cluster.}
+\item{\code{max_iter}}{Integer. Maximum number of iterations for k-means (default = 100).}
 
-\item{\code{donnee_nettoyee}}{Logical. If TRUE, applies automatic data cleaning.}
+\item{\code{auto_clean}}{Logical. If TRUE, applies automatic data cleaning during fit (default = TRUE).}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-A new \code{clusterVariable} object.
+A new `clusterVariable` object.
 }
 }
 \if{html}{\out{<hr>}}
@@ -81,122 +79,156 @@ A new \code{clusterVariable} object.
 \if{latex}{\out{\hypertarget{method-clusterVariable-fit}{}}}
 \subsection{Method \code{fit()}}{
 Fit the K-means clustering model on the provided dataset.
+Data is passed here (not in constructor), following scikit-learn convention.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$fit()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$fit(X, check_missing = TRUE)}\if{html}{\out{</div>}}
 }
 
-\subsection{Details}{
-The method assumes all variables are numeric. It calls the internal
-\code{mon_kmeans()} function to compute clusters.
-}
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{X}}{A numeric data frame or matrix containing variables to cluster.}
 
+\item{\code{check_missing}}{Logical. If TRUE, checks for missing values before fitting (default = TRUE).}
+}
+\if{html}{\out{</div>}}
+}
 \subsection{Returns}{
-Updates the \code{resultat_cluster} field with cluster assignments and centers.
+Self (invisible), to allow method chaining.
 }
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-clusterVariable-predict"></a>}}
 \if{latex}{\out{\hypertarget{method-clusterVariable-predict}{}}}
 \subsection{Method \code{predict()}}{
-Predict cluster assignments for new data based on existing cluster centers.
+Predict cluster assignments for new variables based on existing cluster centers.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$predict(nouveau_data)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$predict(X)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{nouveau_data}}{A data frame or matrix with the same columns as the training data.}
+\item{\code{X}}{A data frame or matrix with the same number of observations as training data.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-A new \code{clusterVariable} object containing the predicted clusters.
+A list containing cluster assignments and distances to centers.
 }
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-clusterVariable-summary"></a>}}
 \if{latex}{\out{\hypertarget{method-clusterVariable-summary}{}}}
 \subsection{Method \code{summary()}}{
-Display a summary of the clustering results.
+Display a detailed summary of the clustering results.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{clusterVariable$summary()}\if{html}{\out{</div>}}
 }
 
 \subsection{Returns}{
-Prints information about clusters, number of variables per cluster,
-and the list of variables assigned to each.
-}
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-clusterVariable-visualiser_clusters"></a>}}
-\if{latex}{\out{\hypertarget{method-clusterVariable-visualiser_clusters}{}}}
-\subsection{Method \code{visualiser_clusters()}}{
-Visualize the clusters using \code{factoextra::fviz_cluster}.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$visualiser_clusters()}\if{html}{\out{</div>}}
-}
-
-\subsection{Returns}{
-A ggplot object showing clustered variables.
-}
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-clusterVariable-tracer_coude"></a>}}
-\if{latex}{\out{\hypertarget{method-clusterVariable-tracer_coude}{}}}
-\subsection{Method \code{tracer_coude()}}{
-Plot the elbow curve to determine the optimal number of clusters.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$tracer_coude(k_max = 5)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{k_max}}{Maximum number of clusters to test (default = 5).}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Returns}{
-Displays an elbow plot.
-}
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-clusterVariable-resume_cluster"></a>}}
-\if{latex}{\out{\hypertarget{method-clusterVariable-resume_cluster}{}}}
-\subsection{Method \code{resume_cluster()}}{
-Return a detailed summary of the cluster partitions and statistics.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$resume_cluster()}\if{html}{\out{</div>}}
-}
-
-\subsection{Returns}{
-A list containing cluster partitions, descriptive statistics,
-intra-cluster distances, and inter-cluster distances.
-}
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-clusterVariable-indice_silhoute"></a>}}
-\if{latex}{\out{\hypertarget{method-clusterVariable-indice_silhoute}{}}}
-\subsection{Method \code{indice_silhoute()}}{
-Compute the average silhouette width for the clustering result.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$indice_silhoute()}\if{html}{\out{</div>}}
-}
-
-\subsection{Returns}{
-Numeric value: average silhouette width.
+Prints comprehensive information about the clustering.
 }
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-clusterVariable-print"></a>}}
 \if{latex}{\out{\hypertarget{method-clusterVariable-print}{}}}
 \subsection{Method \code{print()}}{
-Print a short textual summary of the object.
+Print a concise textual summary of the object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{clusterVariable$print()}\if{html}{\out{</div>}}
 }
 
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-clusterVariable-plot_clusters"></a>}}
+\if{latex}{\out{\hypertarget{method-clusterVariable-plot_clusters}{}}}
+\subsection{Method \code{plot_clusters()}}{
+Visualize the clusters using PCA projection.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$plot_clusters()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+A ggplot object showing clustered variables in 2D space.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-clusterVariable-plot_elbow"></a>}}
+\if{latex}{\out{\hypertarget{method-clusterVariable-plot_elbow}{}}}
+\subsection{Method \code{plot_elbow()}}{
+Plot the elbow curve to determine optimal number of clusters.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$plot_elbow(k_max = 10)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{k_max}}{Maximum number of clusters to test (default = 10).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A ggplot object showing the elbow curve.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-clusterVariable-plot_heatmap"></a>}}
+\if{latex}{\out{\hypertarget{method-clusterVariable-plot_heatmap}{}}}
+\subsection{Method \code{plot_heatmap()}}{
+Generate a correlation heatmap showing cluster structure.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$plot_heatmap()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+A pheatmap object.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-clusterVariable-get_variable_silhouettes"></a>}}
+\if{latex}{\out{\hypertarget{method-clusterVariable-get_variable_silhouettes}{}}}
+\subsection{Method \code{get_variable_silhouettes()}}{
+Get silhouette score for each variable.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$get_variable_silhouettes()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+A named vector of silhouette scores.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-clusterVariable-get_silhouette_score"></a>}}
+\if{latex}{\out{\hypertarget{method-clusterVariable-get_silhouette_score}{}}}
+\subsection{Method \code{get_silhouette_score()}}{
+Get overall silhouette score.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$get_silhouette_score()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+Numeric: average silhouette width.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-clusterVariable-cluster_quality_report"></a>}}
+\if{latex}{\out{\hypertarget{method-clusterVariable-cluster_quality_report}{}}}
+\subsection{Method \code{cluster_quality_report()}}{
+Generate a comprehensive report of clustering quality.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{clusterVariable$cluster_quality_report()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+A list with detailed statistics.
+Apply data cleaning pipeline
+Handle missing values
+Handle outliers using IQR method
+Normalize data (standardization)
+Compute silhouette score for each variable
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-clusterVariable-clone"></a>}}
