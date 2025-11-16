@@ -1,15 +1,22 @@
 library(DT)
 library(readxl)
 library(shiny)
-#importer le package creer dans le dossier R
+library(shinyjs)
 library(ClusterVariable)
 
-
 server <- function(input, output, session) {
+
   disable("coude")
   disable("interpreter")
+  disable("Importer")
 
-  # --- Importation des données ---
+
+  # MÉMOIRE DU MODÈLE ENTRAÎNÉ (Pour ce souvenir des calculs de cluster)
+
+  model_reactif <- reactiveVal(NULL)
+
+  # 1. IMPORTATION DES DONNÉES X
+
   data <- reactive({
     req(input$fichier)
     ext <- tools::file_ext(input$fichier$name)
@@ -26,7 +33,8 @@ server <- function(input, output, session) {
       showNotification(paste("Erreur :", e$message), type = "error")
       return(NULL)
     })
-    df
+
+    return(df)
   })
 
   # --- Bouton valider ---
@@ -42,14 +50,14 @@ server <- function(input, output, session) {
     datatable(
       head(data(), 10),
       options = list(pageLength = 10, scrollX = TRUE),
-      rownames = FALSE
-    )
+      rownames = FALSE)
   })
 
-  # ======= Données nettoyées réactives ===========
+
+  # 2. NETTOYAGE DES DONNÉES X
+
   cleaned_data <- reactiveVal(NULL)
 
-  # Mettre à jour cleaned_data dès que data() change
   observe({
     req(data())
     cleaned_data(data())
@@ -60,24 +68,31 @@ server <- function(input, output, session) {
     req(cleaned_data())
     df <- cleaned_data()
 
+    # --- Imputation des NA ---
     if (input$supprimer_na) {
       for (col in names(df)) {
         if (is.numeric(df[[col]])) {
           df[[col]][is.na(df[[col]])] <- mean(df[[col]], na.rm = TRUE)
         } else {
-          df[[col]][df[[col]] == "" | df[[col]] == "NA"] <- "manquant"
+          df[[col]][is.na(df[[col]]) | df[[col]] == "" | df[[col]] == "NA"] <- "manquant"
         }
       }
     }
-    if(input$supprimer_outliers){
-      for (i in names(df)) {
-        if (is.numeric(df[[i]])) {
-          Q1 <- quantile(df[[i]], 0.25, na.rm = TRUE)
-          Q3 <- quantile(df[[i]], 0.75, na.rm = TRUE)
+
+    # --- Outliers : on NE SUPPRIME PAS DE LIGNES !! ---
+    if (input$supprimer_outliers) {
+      for (col in names(df)) {
+        if (is.numeric(df[[col]])) {
+
+          Q1 <- quantile(df[[col]], 0.25, na.rm = TRUE)
+          Q3 <- quantile(df[[col]], 0.75, na.rm = TRUE)
           IQR <- Q3 - Q1
-          lower_bound <- Q1 - 1.5 * IQR
-          upper_bound <- Q3 + 1.5 * IQR
-          df <- df[df[[i]] >= lower_bound & df[[i]] <= upper_bound | is.na(df[[i]]), ]
+
+          low_bound  <- Q1 - 1.5 * IQR
+          high_bound <- Q3 + 1.5 * IQR
+
+          # Remplacement des outliers par NA
+          df[[col]][df[[col]] < low_bound | df[[col]] > high_bound] <- NA
         }
       }
     }
@@ -85,8 +100,9 @@ server <- function(input, output, session) {
     cleaned_data(df)
   })
 
+
   # === Affichage du tableau nettoyé =====
-  output$tableau_importe_nettoye <- renderDT({
+  output$tableau_importe_nettoye_x <- renderDT({
     req(cleaned_data())
     datatable(
       head(cleaned_data(), 10),
@@ -95,9 +111,8 @@ server <- function(input, output, session) {
     )
   })
 
-
   # ==== Statistiques descriptives ====
-  output$statistiques_ui <- renderUI({
+  output$statistiques_x <- renderUI({
     req(cleaned_data())
     df <- cleaned_data()
 
@@ -107,9 +122,8 @@ server <- function(input, output, session) {
       hr(),
 
       h4("Dimensions"),
-      HTML(paste("Nombre de lignes :", nrow(df), "<br>",
-                 "Nombre de colonnes :", ncol(df))),
-
+      HTML(paste("Nombre de lignes :", nrow(df), "<br>,
+		Nombre de colonnes :", ncol(df))),
       hr(),
 
       h4("Types des colonnes"),
@@ -120,14 +134,12 @@ server <- function(input, output, session) {
     )
   })
 
-  #========  passer au clustering ===============
-
   observeEvent(input$passer_clustering, {
     req(cleaned_data())
     updateNavbarPage(session, "onglets", selected = "Clustering")
   })
 
-
+  #========  passer au clustering ===============
   #===apercu des donne netoyes dans la page clustering===
   # tableOutput("tableau_cluster"),
   output$tableau_cluster <- renderDT({
@@ -140,126 +152,276 @@ server <- function(input, output, session) {
   })
 
 
-  #==================================si le user clique sur lancer le clustering==================================
-
+  # ===============================
+  # 3. LANCER LE CLUSTERING (X)
+  # ===============================
 
   observeEvent(input$lancer, {
-    if (!all(sapply(cleaned_data(), is.numeric)) & input$method == "kmeans") {
-      showNotification("Impossible d'appliquer kmeans : toutes les colonnes doivent être numériques.", type = "warning")
-      return()  # stoppe l'exécution du reste
+    req(cleaned_data())
+
+    disable("interpreter")
+    disable("coude")
+    disable("Importer")
+
+    # Vérification kmeans
+    if (input$method == "kmeans" &&
+        !all(sapply(cleaned_data(), is.numeric))) {
+      showNotification("kmeans : toutes les colonnes doivent être numériques.", type = "warning")
+      return()
     }
 
-    req(cleaned_data())
-    if(input$method == "kmeans"){
-      cluster_quanti <- clusterVariable$new(
-        k = input$k,
-        data = cleaned_data()
-      )
-      cluster_quanti$fit()
+    # ---- KMEANS ----
+    if (input$method == "kmeans") {
+      model <- clusterVariable$new(k = input$k, data = cleaned_data())
+      model$fit()
+
+      model_reactif(model)     # On sauvegarde le modèle
+
       enable("coude")
+      enable("Importer")
       enable("interpreter")
 
-      output$Résumé <- renderPrint({
-        cluster_quanti$summary()
-      })
-
-    }
-    if(input$method == "CAH"){
-        k_val <- if(is.na(input$k) || input$k == 0) NULL else input$k
-
-        cluster_quanti <- CAH$new("ward.D2")
-        cluster_quanti$fit(cleaned_data())
-        cluster_quanti$cutree(k = k_val)  # Fonctionne avec k ou NULL
-
-        output$Résumé <- renderPrint({
-          cluster_quanti$print()
-    })
+      output$Résumé <- renderPrint(model$summary())
     }
 
-    if(input$method == "ACM"){
-      # Appel les methode de marvin
+    # ---- CAH ----
+    if (input$method == "CAH") {
+
+      k_val <- suppressWarnings(as.numeric(input$k))
+      if (is.na(k_val) || k_val <= 1) k_val <- NULL
+
+      model <- CAH$new("ward.D2")
+      model$fit(cleaned_data())
+      model$cutree(k = k_val)
+
+      model_reactif(model)     # On sauvegarde le modele
+
+      enable("coude")
+      enable("Importer")
+
+      output$Résumé <- renderPrint(model$print())
+    }
+
+    if(input$method == "ACM") {
+      #Partie de Marvin
     }
   })
 
 
-
-
-  #=========================si le user clique sur voir coude ==============================
-
+  # ===============================
+  # 4. MÉTHODE DU COUDE
+  # ===============================
 
   observeEvent(input$coude, {
     req(cleaned_data())
-    if(input$method == "kmeans"){
-      cluster_quanti <- clusterVariable$new(
-        k = input$k,
-        data = cleaned_data()
-      )
-      cluster_quanti$fit()
+
+    if (input$method == "kmeans") {
+      model <- clusterVariable$new(k = input$k)
+      model$fit(cleaned_data())
 
       output$afficher_coude <- renderPlot({
-        print(cluster_quanti$tracer_coude())
+        model$tracer_coude()
       })
     }
-    if(input$method == "CAH"){
-      # appel les methode de milena
+    if (input$method == "CAH"){
+      #Miléna
+
     }
-    if(input$method == "ACM"){
-      # appel les methode de marvin
+    if (input$method == "ACM"){
+      #Partie de Marvin
     }
   })
 
 
-
-
-  #=============================si le user clique sur le bouton resume    =======================
+  # ===============================
+  # 5. INTERPRÉTATION (X)
+  # ===============================
 
   observeEvent(input$interpreter, {
-    updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")  #rediriger vers la page des resultats
-
     req(cleaned_data())
-    if(input$method == "kmeans"){
-      cluster_quanti <- clusterVariable$new(
-        k = input$k,
-        data = cleaned_data()
-      )
-      cluster_quanti$fit()
+
+    updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
+
+    model <- model_reactif()
+    if (is.null(model)) {
+      showNotification("Veuillez lancer le clustering d'abord.", type = "error")
+      return()
+    }
+
+    # === KMEANS ===
+    if (input$method == "kmeans") {
 
       output$qualite <- renderPrint({
-        indice <- cluster_quanti$indice_silhoute()
-        if (is.factor(indice)) {
-          indice <- as.numeric(as.character(indice))
-        }
-        cat("la valeur de l'indice de silhoutte est :", round(indice, 4))
+        sil <- model$indice_silhoute()
+        if (is.factor(sil)) sil <- as.numeric(as.character(sil))
+        cat("Silhouette =", round(sil, 4))
       })
 
-      output$pca_plot <- renderPlot({
-        cluster_quanti$visualiser_clusters()
-      })
+      output$pca_plot <- renderPlot(model$visualiser_clusters())
+      output$heatmap <- renderPlot(model$heatmap_clusters())
 
-      output$heatmap <- renderPlot({
-        cluster_quanti$heatmap_clusters()
-      })
-
-      # Afficher le résumé des partitions et autres résultats dans le texte
       output$summary_output <- renderPrint({
-        results <- cluster_quanti$resume_cluster()
-        cat("=== Nature des partitions ===\n")
-        print(results$partitions)
-        cat("\n=== Distances intra-cluster ===\n")
-        print(results$distances_intra)
-        cat("\n=== Distances inter-cluster ===\n")
-        print(results$dist_inter_cluster)
+        res <- model$resume_cluster()
+        cat("=== Partitions ===\n")
+        print(res$partitions)
+        cat("\n=== Distances intra ===\n")
+        print(res$distances_intra)
+        cat("\n=== Distances inter ===\n")
+        print(res$dist_inter_cluster)
       })
-
-    }
-    if(input$method == "CAH"){
-      cluster_quanti$summary()
-    }
-    if(input$method == "ACM"){
-      # appel les methode de marvin
     }
 
+    # === CAH ===
+    if (input$method == "CAH") {
+      output$summary_output <- renderPrint({
+        model$summary()
+      })
+    }
+
+    if (input$method == "ACM"){
+      #Partie de Marvin
+    }
   })
 
+
+  # ==================================================
+  # 6. IMPORTATION DES VARIABLES EXPLICATIVES
+  # ==================================================
+
+  observeEvent(input$Importer, {
+    updateNavbarPage(session, "onglets", selected = "Importation_explanatory variable")
+  })
+
+
+  data_exp <- reactive({
+    req(input$fichier_exp)
+    ext <- tools::file_ext(input$fichier_exp$name)
+
+    df <- tryCatch({
+      if (ext == "csv") {
+        read.csv(input$fichier_exp$datapath, sep = input$separateur_exp)
+      } else if (ext %in% c("xlsx", "xls")) {
+        read_excel(input$fichier_exp$datapath)
+      } else {
+        stop("Format non pris en charge.")
+      }
+    }, error = function(e) {
+      showNotification(paste("Erreur explicatives:", e$message), type = "error")
+      return(NULL)
+    })
+
+    return(df)
+  })
+
+  output$tableau_import_exp <- renderDT({
+    req(data_exp())
+    datatable(head(data_exp(), 10),
+              options = list(pageLength = 10, scrollX = TRUE),
+              rownames = FALSE)
+  })
+
+  observeEvent(input$valider_exp, {
+    req(data_exp())
+    showNotification("Variables explicatives importées.", type = "message")
+    updateNavbarPage(session, "onglets", selected = "Cleaning_explanatory variable")
+  })
+
+
+  # 7. NETTOYAGE EXPLICATIVES
+
+  cleaned_data_exp <- reactiveVal(NULL)
+
+  observe({
+    req(data_exp())
+    cleaned_data_exp(data_exp())
+  })
+
+  observeEvent(input$nettoyer_exp, {
+    req(cleaned_data_exp())
+    df <- cleaned_data_exp()
+
+    if (input$supprimer_na_exp) {
+      for (col in names(df)) {
+        if (is.numeric(df[[col]])) {
+          df[[col]][is.na(df[[col]])] <- mean(df[[col]], na.rm = TRUE)
+        } else {
+          df[[col]][is.na(df[[col]]) | df[[col]] == "" | df[[col]] == "NA"] <- "manquant"
+        }
+      }
+    }
+
+    if (input$supprimer_outliers_exp) {
+      for (col in names(df)) {
+        if (is.numeric(df[[col]])) {
+
+          Q1 <- quantile(df[[col]], 0.25, na.rm = TRUE)
+          Q3 <- quantile(df[[col]], 0.75, na.rm = TRUE)
+          IQR <- Q3 - Q1
+
+          low_bound  <- Q1 - 1.5 * IQR
+          high_bound <- Q3 + 1.5 * IQR
+
+          df[[col]][df[[col]] < low_bound | df[[col]] > high_bound] <- NA
+        }
+      }
+    }
+
+    cleaned_data_exp(df)
+  })
+
+  output$tableau_importe_nettoye_exp <- renderDT({
+    req(cleaned_data_exp())
+    datatable(head(cleaned_data_exp(), 10),
+              options = list(pageLength = 10, scrollX = TRUE),
+              rownames = FALSE
+    )
+  })
+  # ==== Statistiques descriptives ====
+  output$statistiques_exp <- renderUI({
+    req(cleaned_data())
+    df <- cleaned_data()
+
+    tagList(
+      DT::datatable(summary(df)),
+
+      hr(),
+
+      h4("Dimensions"),
+      HTML(paste("Nombre de lignes :", nrow(df), "<br>,
+		Nombre de colonnes :", ncol(df))),
+      hr(),
+
+      h4("Types des colonnes"),
+      DT::datatable(
+        data.frame(Colonne = names(df), Type = sapply(df, class)),
+        rownames = FALSE
+      )
+    )
+  })
+
+
+
+  # 8. PRÉDICTION AVEC VARIABLES EXPLICATIVES
+  observeEvent(input$Prediction, {
+    req(cleaned_data(), cleaned_data_exp())
+
+    updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
+
+    model <- model_reactif()
+
+    if (is.null(model)) {
+      showNotification("Veuillez lancer le clustering d'abord.", type = "error")
+      return()
+    }
+
+    pred <- model$predict(X = cleaned_data_exp())
+
+    output$summary_output <- renderPrint({
+      cat("=== Résultats de la prédiction ===\n")
+      model$summary()
+    })
+
+    showNotification("Prédiction effectuée.", type = "message")
+  })
 
 }
