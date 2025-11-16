@@ -62,11 +62,6 @@ ui <- navbarPage(
               value = FALSE
             ),
             checkboxInput(
-              "normaliser",
-              "Normaliser les variables numériques",
-              value = FALSE
-            ),
-            checkboxInput(
               "supprimer_outliers",
               "Supprimer les valeurs aberrantes",
               value = FALSE
@@ -99,7 +94,7 @@ ui <- navbarPage(
             h4(class = "section-title", "Paramètres"),
             selectInput(
               "method", "Méthode",
-              choices = c("kmeans", "kmodes", "hierarchical")
+              choices = c("kmeans", "kmodes", "CAH")
             ),
             numericInput("k", "Nombre de clusters (k)", value = 2, min = 2, step = 1),
             actionButton("lancer", "Lancer le clustering", icon = icon("play")) ,
@@ -108,7 +103,9 @@ ui <- navbarPage(
             actionButton("coude" ,"Afficher la méthode du coude"  , ) ,
             br() ,
             #resume du kmenas
-            actionButton("interpreter" ,"interpreter les resultats"  ,)
+            # actionButton("interpreter" ,"interpreter les resultats"  ,) ,
+            #Predire avec les variable
+            actionButton("Importer" ,"Impotrer les variables illustrative"  ,)
         )
       ),
       mainPanel(
@@ -130,6 +127,7 @@ ui <- navbarPage(
     )
   )  ,
 
+  #Autre a faire pour X_nouv
   #============  page de resultats du kmenas ==============================
   tabPanel(
     "Résultats du Clustering",
