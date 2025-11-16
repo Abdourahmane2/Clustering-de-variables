@@ -157,11 +157,14 @@ clusterVariable <- R6::R6Class(
       cluster_assignments <- apply(distances, 2, which.min)
       min_distances <- apply(distances, 2, min)
 
-      return(list(
-        cluster = cluster_assignments,
-        distances = min_distances,
-        variable_names = colnames(X)
-      ))
+      predictions_df <- data.frame(
+        Variable = colnames(X),
+        Cluster = cluster_assignments
+      )
+
+
+      return(predictions_df)
+
     },
 
     #======================== fin Predict =====================================
@@ -518,7 +521,6 @@ cluster_quality_report = function() {
     }
   )
 )
-
 
 
 
