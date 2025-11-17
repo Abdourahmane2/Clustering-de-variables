@@ -1,12 +1,12 @@
-library(R6)
-library(readxl)
-
 # Vérification et chargement packages
 if (!requireNamespace("FactoMineR", quietly = TRUE)) install.packages("FactoMineR")
 if (!requireNamespace("factoextra", quietly = TRUE)) install.packages("factoextra")
+if (!requireNamespace("R6", quietly = TRUE)) install.packages("R6")
+if (!requireNamespace("readxl", quietly = TRUE)) install.packages("readxl")
 library(FactoMineR)
 library(factoextra)
-
+library(R6)
+library(readxl)
 
 
 
@@ -550,5 +550,6 @@ model$plot_scree()
 # # 9. Prédiction pour nouvelles variables
 # # new_data <- data.frame(...)
 # # predictions <- model$predict(new_data, type = "variables")
+
 
 
