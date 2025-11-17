@@ -397,7 +397,7 @@ ClusteringACM <- R6::R6Class(
     
     
     # ========================================================================
-    # MCA ACCESSOR METHODS
+    # MCA METHODS
     # ========================================================================
     
     #' @description Get eigenvalues from MCA
@@ -676,4 +676,5 @@ ClusteringACM <- R6::R6Class(
     }
   )
 )
+
 
