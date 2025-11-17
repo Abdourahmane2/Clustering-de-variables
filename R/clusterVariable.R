@@ -111,13 +111,13 @@ clusterVariable <- R6::R6Class(
     },
 
 
-    #============================fin du fit ============================
+    #============================End of fit ============================
 
 
 
 
 
-    #======================== debut  Predict =====================================
+    #======================== Start of Predict =====================================
     #' @description
     #' Predict cluster assignments for new variables based on existing cluster centers.
     #'
@@ -167,9 +167,9 @@ clusterVariable <- R6::R6Class(
 
     },
 
-    #======================== fin Predict =====================================
+    #======================== End of Predict =====================================
 
-    #========================  debut Summary =====================================
+    #======================== Start of Summary =====================================
 
     #' @description
     #' Display a detailed summary of the clustering results.
@@ -185,11 +185,11 @@ clusterVariable <- R6::R6Class(
       cat("========================================\n\n")
 
       cat("Method: K-means\n")
-      cat("Nombre de clusters :", self$k, "\n")
-      cat("nombre de variables :", length(self$cluster_result$cluster), "\n")
-      cat("score de silhoutte:", round(private$overall_silhouette, 3), "\n\n")
+      cat("Number of clusters:", self$k, "\n")
+      cat("Number of variables:", length(self$cluster_result$cluster), "\n")
+      cat("Silhouette score:", round(private$overall_silhouette, 3), "\n\n")
 
-      cat("distribution des clusters:\n")
+      cat("Cluster distribution:\n")
       cat("--------------------\n")
       for (i in 1:self$k) {
         n_vars <- sum(self$cluster_result$cluster == i)
@@ -197,7 +197,7 @@ clusterVariable <- R6::R6Class(
         cat(sprintf("Cluster %d: %d variables (%.1f%%)\n", i, n_vars, pct))
       }
 
-      cat("\nVariables par clusters :\n")
+      cat("\nVariables by cluster:\n")
       cat("--------------------\n")
       for (i in 1:self$k) {
         vars_in_cluster <- names(self$data)[which(self$cluster_result$cluster == i)]
@@ -207,36 +207,73 @@ clusterVariable <- R6::R6Class(
 
           # Show mean silhouette for this cluster
           sil_cluster <- private$variable_silhouettes[self$cluster_result$cluster == i]
-          cat("  silhoutte moyen:", round(mean(sil_cluster), 3), "\n")
+          cat("  Mean silhouette:", round(mean(sil_cluster), 3), "\n")
         } else {
-          cat("  (cluster vide)\n")
+          cat("  (empty cluster)\n")
         }
       }
 
       cat("\n========================================\n\n")
     },
 
-    #======================== fin Summary =====================================
+    #======================== End of Summary =====================================
 
-    #========================  debut Print ===============================
+    #======================== Start of Print ===============================
 
     #' @description
-    #' Print a concise textual summary of the object.
+    #' Print a concise summary of the clusterVariable object.
     print = function() {
-      cat("clusterVariable object\n")
-      cat("----------------------\n")
-      if (is.null(self$cluster_result)) {
-        cat("Status: Not fitted\n")
-        cat("Number of clusters (k):", self$k, "\n")
-      } else {
-        cat("Status: Fitted\n")
-        cat("Number of clusters:", self$k, "\n")
-        cat("Number of variables:", ncol(self$data), "\n")
-        cat("Overall silhouette:", round(private$overall_silhouette, 3), "\n")
-      }
-    },
+      cat("\n")
+      cat("══════════════════════════════════════════\n")
+      cat("   Clustering Results\n")
+      cat("══════════════════════════════════════════\n\n")
 
-    #======================== fin Print ===============================
+      if (is.null(self$cluster_result)) {
+        cat(" Status         : Not fitted\n")
+        cat(" K (clusters)   : ", self$k, "\n", sep = "")
+        cat(" Max iterations : ", private$max_iter, "\n", sep = "")
+        cat(" Auto-clean     : ", ifelse(private$auto_clean, "✓ Enabled", "✗ Disabled"), "\n\n", sep = "")
+        cat(" Use fit(X) to train the model\n")
+
+      } else {
+        cat(" Status         : ✓ Fitted\n")
+        cat(" K (clusters)   : ", self$k, "\n", sep = "")
+        cat(" Variables      : ", ncol(self$data), "\n", sep = "")
+        cat(" Observations   : ", nrow(self$data), "\n", sep = "")
+
+        # Silhouette with interpretation
+        sil_score <- round(private$overall_silhouette, 3)
+        sil_quality <- if (sil_score >= 0.7) {
+          paste0(sil_score, " (Excellent)")
+        } else if (sil_score >= 0.5) {
+          paste0(sil_score, " (Good)")
+        } else if (sil_score >= 0.25) {
+          paste0(sil_score, " (Acceptable)")
+        } else {
+          paste0(sil_score, " (Poor)")
+        }
+        cat(" Silhouette     : ", sil_quality, "\n", sep = "")
+
+        # Cluster distribution
+        cat("\n Distribution:\n")
+        cluster_counts <- table(self$cluster_result$cluster)
+        for (i in 1:self$k) {
+          count <- as.numeric(cluster_counts[i])
+          pct <- round(100 * count / ncol(self$data), 1)
+          bar_length <- round(pct / 5)  # Proportional bar
+          bar <- paste(rep("█", bar_length), collapse = "")
+          cat(sprintf("   Cluster %d: %2d vars (%5.1f%%) %s\n",
+                      i, count, pct, bar))
+        }
+
+
+      }
+
+      cat("\n══════════════════════════════════════════\n\n")
+      invisible(self)
+    } ,
+
+    #======================== End of Print ===============================
 
     #======================== Visualization Methods ========================
 
@@ -268,7 +305,7 @@ clusterVariable <- R6::R6Class(
         geom_text(aes(label = Variable), size = 3, vjust = -1, show.legend = FALSE) +
         scale_size_continuous(range = c(2, 6)) +
         labs(
-          title = "visualisation des clusters de variables via ACP",
+          title = "Variable Cluster Visualization via PCA",
           subtitle = paste("K =", self$k, "| Overall Silhouette =", round(private$overall_silhouette, 3)),
           x = paste0("PC1 (", round(summary(pca)$importance[2, 1] * 100, 1), "%)"),
           y = paste0("PC2 (", round(summary(pca)$importance[2, 2] * 100, 1), "%)")
@@ -281,71 +318,71 @@ clusterVariable <- R6::R6Class(
 
       return(p)
     },
-#============================== elbow method ==========================================
+    #============================== Elbow method ==========================================
     #' @description
     #' Plot the elbow curve to determine optimal number of clusters.
     #'
     #' @param k_max Maximum number of clusters to test (default = 10).
     #' @return A ggplot object showing the elbow curve.
     #'
-plot_elbow = function(k_max = 10) {
-  if (is.null(self$data)) {
-    stop("Error: No data available. Run fit() first.")
-  }
-
-  n_max_possible <- nrow(t(self$data))
-  if (k_max > n_max_possible) {
-    warning(paste("k_max ajuste a", n_max_possible, "(nombre maximum de clusters possibles)"))
-    k_max <- n_max_possible
-  }
-
-  inertie <- numeric(k_max)
-  for (k in 1:k_max) {
-    set.seed(123)
-    kmeans_result <- mon_kmeans(self$data, k = k)
-    centres <- kmeans_result$centers
-    clusters <- kmeans_result$cluster
-    sum_sq <- 0
-    data_t <- t(self$data)
-    for (i in 1:k) {
-      points_cluster <- data_t[clusters == i, , drop = FALSE]
-      if (nrow(points_cluster) > 0) {
-        sum_sq <- sum_sq + sum(rowSums((points_cluster -
-                                          matrix(centres[i, ],
-                                                 nrow = nrow(points_cluster),
-                                                 ncol = ncol(points_cluster),
-                                                 byrow = TRUE))^2))
+    plot_elbow = function(k_max = 10) {
+      if (is.null(self$data)) {
+        stop("Error: No data available. Run fit() first.")
       }
-    }
-    inertie[k] <- sum_sq
-  }
 
-  # Create plot
-  plot_df <- data.frame(k = 1:k_max, inertie = inertie)
-  p <- ggplot(plot_df, aes(x = k, y = inertie)) +
-    geom_line(color = "steelblue", size = 1) +
-    geom_point(color = "steelblue", size = 3) +
-    labs(
-      title = "methode du coude pour choisir le nombre optimal de clusters",
-      x = "Nombre de clusters  (k)",
-      y = "inertie intra-classe"
-    ) +
-    theme_minimal() +
-    theme(plot.title = element_text(face = "bold", size = 14)) +
-    scale_x_continuous(breaks = 1:k_max)
+      n_max_possible <- nrow(t(self$data))
+      if (k_max > n_max_possible) {
+        warning(paste("k_max adjusted to", n_max_possible, "(maximum possible clusters)"))
+        k_max <- n_max_possible
+      }
 
-  # Ajouter la ligne verticale et l'annotation seulement si k est dans la plage affichée
-  if (!is.null(self$k) && self$k >= 1 && self$k <= k_max) {
-    p <- p +
-      geom_vline(xintercept = self$k, linetype = "dashed", color = "red", alpha = 0.7) +
-      annotate("text", x = self$k, y = max(inertie) * 0.9,
-               label = paste(" k chosit =", self$k), color = "red", hjust = -0.1)
-  }
+      inertia <- numeric(k_max)
+      for (k in 1:k_max) {
+        set.seed(123)
+        kmeans_result <- mon_kmeans(self$data, k = k)
+        centers <- kmeans_result$centers
+        clusters <- kmeans_result$cluster
+        sum_sq <- 0
+        data_t <- t(self$data)
+        for (i in 1:k) {
+          points_cluster <- data_t[clusters == i, , drop = FALSE]
+          if (nrow(points_cluster) > 0) {
+            sum_sq <- sum_sq + sum(rowSums((points_cluster -
+                                              matrix(centers[i, ],
+                                                     nrow = nrow(points_cluster),
+                                                     ncol = ncol(points_cluster),
+                                                     byrow = TRUE))^2))
+          }
+        }
+        inertia[k] <- sum_sq
+      }
 
-  return(p)
-} ,
+      # Create plot
+      plot_df <- data.frame(k = 1:k_max, inertia = inertia)
+      p <- ggplot(plot_df, aes(x = k, y = inertia)) +
+        geom_line(color = "steelblue", size = 1) +
+        geom_point(color = "steelblue", size = 3) +
+        labs(
+          title = "Elbow Method to Choose Optimal Number of Clusters",
+          x = "Number of clusters (k)",
+          y = "Within-cluster inertia"
+        ) +
+        theme_minimal() +
+        theme(plot.title = element_text(face = "bold", size = 14)) +
+        scale_x_continuous(breaks = 1:k_max)
 
-#=============================heatmap=========================================
+      # Add vertical line and annotation only if k is in the displayed range
+      if (!is.null(self$k) && self$k >= 1 && self$k <= k_max) {
+        p <- p +
+          geom_vline(xintercept = self$k, linetype = "dashed", color = "red", alpha = 0.7) +
+          annotate("text", x = self$k, y = max(inertia) * 0.9,
+                   label = paste("Selected k =", self$k), color = "red", hjust = -0.1)
+      }
+
+      return(p)
+    } ,
+
+    #============================= Heatmap =========================================
 
     #' @description
     #' Generate a correlation heatmap showing cluster structure.
@@ -356,32 +393,34 @@ plot_elbow = function(k_max = 10) {
         stop("Error: Model not fitted yet. Run fit() first.")
       }
 
-      # Compute correlation matrix
       cor_matrix <- cor(self$data)
-
-      # Order by clusters
       cluster_order <- order(self$cluster_result$cluster)
       cor_matrix_ordered <- cor_matrix[cluster_order, cluster_order]
 
-      # Create annotation
       annotation_col <- data.frame(
         Cluster = factor(self$cluster_result$cluster[cluster_order])
       )
       rownames(annotation_col) <- colnames(cor_matrix_ordered)
 
-      # Create heatmap
-     return( pheatmap::pheatmap(
-       cor_matrix_ordered,
-       cluster_rows = FALSE,
-       cluster_cols = FALSE,
-       annotation_col = annotation_col,
-       annotation_row = annotation_col,
-       main = paste("Variable Correlation Heatmap (k =", self$k, ")"),
-       fontsize = 10,
-       fontsize_row = 8,
-       fontsize_col = 8
-     ))
-    },
+      # Simplified version that always works in Shiny
+      p <- pheatmap::pheatmap(
+        cor_matrix_ordered,
+        cluster_rows = FALSE,
+        cluster_cols = FALSE,
+        annotation_col = annotation_col,
+        annotation_row = annotation_col,
+        main = paste("Correlation Heatmap (k =", self$k, ")"),
+        fontsize = 10,
+        fontsize_row = 8,
+        fontsize_col = 8,
+        silent = TRUE  # DO NOT FORGET
+      )
+
+      # Explicit display
+      grid::grid.newpage()
+      grid::grid.draw(p$gtable)
+    } ,
+
 
     #' @description
     #' Get silhouette score for each variable.
@@ -393,7 +432,7 @@ plot_elbow = function(k_max = 10) {
       }
       return(private$variable_silhouettes)
     },
-#======================== Quality Evaluation Methods ========================
+    #======================== Quality Evaluation Methods ========================
     #' @description
     #' Get overall silhouette score.
     #'
@@ -410,45 +449,117 @@ plot_elbow = function(k_max = 10) {
     #' @description
     #' Generate a comprehensive report of clustering quality.
     #'
-    #' @return A list with detailed statistics.
-cluster_quality_report = function() {
-  if (is.null(self$cluster_result)) {
-    stop("Error: Model not fitted yet. Run fit() first.")
-  }
+    #' @return Prints detailed statistics about clustering quality.
+    cluster_quality_report = function() {
+      if (is.null(self$cluster_result)) {
+        stop("Error: Model not fitted yet. Run fit() first.")
+      }
 
-  report <- list(
-    summary = paste("Clustering réalisé avec k =", self$k, "clusters sur",
-                    ncol(self$data), "variables."),
+      cat("\n========================================\n")
+      cat("  VARIABLE CLUSTERING SUMMARY\n")
+      cat("========================================\n\n")
 
-    overall_quality = paste("Silhouette globale :",
-                            round(private$overall_silhouette, 3),
-                            "-",
-                            ifelse(private$overall_silhouette >= 0.7, "Excellente structure",
-                                   ifelse(private$overall_silhouette >= 0.5, "Structure raisonnable",
-                                          ifelse(private$overall_silhouette >= 0.25, "Structure faible",
-                                                 "Pas de structure substantielle")))),
+      cat("Method: K-means\n")
+      cat("Number of clusters:", self$k, "\n")
+      cat("Number of variables:", length(self$cluster_result$cluster), "\n")
 
-    overall_silhouette = private$overall_silhouette,
+      # Global score interpretation
+      cat("Silhouette score:", round(private$overall_silhouette, 3))
+      if (private$overall_silhouette >= 0.7) {
+        cat(" ✓✓✓ (Excellent structure)\n")
+      } else if (private$overall_silhouette >= 0.5) {
+        cat(" ✓✓  (Good structure)\n")
+      } else if (private$overall_silhouette >= 0.25) {
+        cat(" ✓   (Acceptable but weak structure)\n")
+      } else {
+        cat(" ✗   (Very weak structure)\n")
+      }
+      cat("\n")
 
-    cluster_sizes = table(self$cluster_result$cluster),
+      cat("Cluster distribution:\n")
+      cat("--------------------\n")
+      for (i in 1:self$k) {
+        n_vars <- sum(self$cluster_result$cluster == i)
+        pct <- round(100 * n_vars / length(self$cluster_result$cluster), 1)
+        cat(sprintf("Cluster %d: %d variables (%.1f%%)\n", i, n_vars, pct))
+      }
 
-    cluster_silhouettes = tapply(private$variable_silhouettes,
-                                 self$cluster_result$cluster,
-                                 mean),
+      cat("\nVariables by cluster:\n")
+      cat("--------------------\n")
 
-    poorly_classified = if(length(names(self$data)[private$variable_silhouettes < 0.5]) > 0) {
-      paste("Variables mal classées (silhouette < 0.5) :",
-            paste(names(self$data)[private$variable_silhouettes < 0.5], collapse = ", "))
-    } else {
-      "Aucune variable mal classée."
-    },
+      for (i in 1:self$k) {
+        vars_in_cluster <- names(self$data)[which(self$cluster_result$cluster == i)]
+        sil_cluster <- private$variable_silhouettes[self$cluster_result$cluster == i]
+        mean_sil <- mean(sil_cluster)
 
-    well_classified = paste("Variables bien classées (silhouette >= 0.5) :",
-                            paste(names(self$data)[private$variable_silhouettes >= 0.5], collapse = ", "))
-  )
+        cat("\nCluster", i, ":\n")
 
-  return(report)
-}
+        if (length(vars_in_cluster) > 0) {
+          # Display variables with their individual quality
+          cat("  Variables: ")
+
+          # Create annotated list
+          annotated_vars <- character(length(vars_in_cluster))
+          for (j in seq_along(vars_in_cluster)) {
+            var_sil <- sil_cluster[j]
+            # Add quality indicator
+            if (var_sil >= 0.7) {
+              annotated_vars[j] <- paste0(vars_in_cluster[j], " (✓✓✓ ", round(var_sil, 2), ")")
+            } else if (var_sil >= 0.5) {
+              annotated_vars[j] <- paste0(vars_in_cluster[j], " (✓✓ ", round(var_sil, 2), ")")
+            } else if (var_sil >= 0.25) {
+              annotated_vars[j] <- paste0(vars_in_cluster[j], " (✓ ", round(var_sil, 2), ")")
+            } else if (var_sil >= 0) {
+              annotated_vars[j] <- paste0(vars_in_cluster[j], " (~ ", round(var_sil, 2), ")")
+            } else {
+              annotated_vars[j] <- paste0(vars_in_cluster[j], " (✗ ", round(var_sil, 2), ")")
+            }
+          }
+
+          cat(paste(annotated_vars, collapse = ", "), "\n")
+
+          # Mean silhouette of cluster with interpretation
+          cat("  Mean silhouette:", round(mean_sil, 3))
+          if (mean_sil >= 0.5) {
+            cat(" → Cohesive cluster ✓\n")
+          } else if (mean_sil >= 0.25) {
+            cat(" → Moderate cohesion\n")
+          } else {
+            cat(" → Weak cohesion ⚠\n")
+          }
+
+          # Detail of variable quality in this cluster
+          n_excellent <- sum(sil_cluster >= 0.7)
+          n_good <- sum(sil_cluster >= 0.5 & sil_cluster < 0.7)
+          n_acceptable <- sum(sil_cluster >= 0.25 & sil_cluster < 0.5)
+          n_poor <- sum(sil_cluster < 0.25)
+
+          cat("  Quality: ")
+          details <- c()
+          if (n_excellent > 0) details <- c(details, paste(n_excellent, "excellent"))
+          if (n_good > 0) details <- c(details, paste(n_good, "good"))
+          if (n_acceptable > 0) details <- c(details, paste(n_acceptable, "acceptable"))
+          if (n_poor > 0) details <- c(details, paste(n_poor, "poor ⚠"))
+
+          cat(paste(details, collapse = ", "), "\n")
+
+        } else {
+          cat("  (empty cluster)\n")
+        }
+      }
+
+      cat("\n========================================\n\n")
+
+      cat("Legend of indicators:\n")
+      cat("  ✓✓✓ = Excellent (≥ 0.7)\n")
+      cat("  ✓✓  = Good (≥ 0.5)\n")
+      cat("  ✓   = Acceptable (≥ 0.25)\n")
+      cat("  ~   = Poor (< 0.25)\n")
+      cat("  ✗   = Very poor (< 0)\n\n")
+
+
+    }
+
   ),
 
   #======================== Private Methods ========================
@@ -472,8 +583,6 @@ cluster_quality_report = function() {
       for (i in 1:ncol(data)) {
         if (is.numeric(data[[i]])) {
           data[[i]][is.na(data[[i]])] <- median(data[[i]], na.rm = TRUE)
-        } else {
-          data[[i]][is.na(data[[i]])] <- "missing"
         }
       }
       return(data)
@@ -517,11 +626,7 @@ cluster_quality_report = function() {
       private$variable_silhouettes <- sil[, "sil_width"]  # Silhouette width for each variable
       names(private$variable_silhouettes) <- names(self$data)
 
-      private$overall_silhouette <- mean(sil[, "sil_width"])  #silhouette moyenne
+      private$overall_silhouette <- mean(sil[, "sil_width"])  # Mean silhouette
     }
   )
 )
-
-
-
-

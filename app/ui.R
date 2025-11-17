@@ -4,6 +4,9 @@ library(DT)
 library(bslib)
 library(shinyjs)
 
+# Configuration globale pour accepter les gros fichiers (200 MB)
+options(shiny.maxRequestSize = 200 * 1024^2)
+
 ui <- navbarPage(
   useShinyjs() ,    #pour desactiver les buttons
   id = "onglets",
@@ -25,6 +28,8 @@ ui <- navbarPage(
               "fichier", "Fichier (CSV ou Excel)",
               accept = c(".csv", ".xlsx", ".xls")
             ),
+            # Indication de la taille maximale
+            helpText("Taille maximale : 1GB", style = "color: #666; font-size: 0.9em;"),
             selectInput(
               "separateur", "Séparateur",
               choices = c(Virgule = ",",
@@ -40,7 +45,6 @@ ui <- navbarPage(
             h4(class = "section-title", "Aperçu des données importées"),
             DTOutput("tableau_import"),
             hr(),
-            h4("Résultats du clustering"),
             tableOutput("cluster"),
             verbatimTextOutput("summary")
         )
@@ -58,12 +62,7 @@ ui <- navbarPage(
             h4(class = "section-title", "Options de nettoyage"),
             checkboxInput(
               "supprimer_na",
-              "Imputation : numériques → moyenne ; catégorielles → « manquant »",
-              value = FALSE
-            ),
-            checkboxInput(
-              "supprimer_outliers",
-              "Supprimer les valeurs aberrantes",
+              "remplacer les Na par la moyenne ",
               value = FALSE
             ),
             div(class = "d-grid gap-2",
@@ -105,7 +104,9 @@ ui <- navbarPage(
             #resume du kmenas
             # actionButton("interpreter" ,"interpreter les resultats"  ,) ,
             #Predire avec les variable
-            actionButton("Importer" ,"Impotrer les variables illustrative"  ,)
+            actionButton("Importer" ,"Impotrer les variables illustrative") ,
+            br()  ,
+            actionButton("interpreter" ,"resultats detaille du clustering")
         )
       ),
       mainPanel(
@@ -140,6 +141,8 @@ ui <- navbarPage(
               "fichier_exp", "Fichier (CSV ou Excel)",
               accept = c(".csv", ".xlsx", ".xls")
             ),
+            # Indication de la taille maximale
+            helpText("Taille maximale : 1GB", style = "color: #666; font-size: 0.9em;"),
             selectInput(
               "separateur_exp", "Séparateur",
               choices = c(Virgule = ",",
@@ -206,7 +209,7 @@ ui <- navbarPage(
     fluidPage(
       tabsetPanel(id = "tabs_resultats_clustering", type = "tabs",
 
-                   # Onglet 1 : Indicateurs de qualité
+                  # Onglet 1 : Indicateurs de qualité
                   tabPanel("Qualité du Clustering",
                            br() ,
                            h4("Indicateurs de Qualité"),
@@ -218,26 +221,16 @@ ui <- navbarPage(
                   # Onglet 2 : Visualisations
                   tabPanel("Visualisations",
                            br() ,
-
-                           h4("Visualisations du Clustering avec la fonction fviz_cluster"),
                            plotOutput("pca_plot"),
-                           br() ,
-                           h5("heatmap des centres de clusters"),
                            br()  ,
-                           plotOutput("heatmap"),
-
-                  ),
-
-                  # Onglet 3 : Résumé des Résultats
-                  tabPanel("Résumé des Résultats",
-                           br() ,
-                           h4("Résumé détaillé du clustering"),
-                           br() ,
-                           verbatimTextOutput("summary_output"),  # Résumé des clusters
-                           plotOutput("cluster_plot")  # Visualisation graphique des clusters
+                           plotOutput("heatmap")
 
                   )
+
+
       )
     )
   )
-  )
+)
+
+

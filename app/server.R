@@ -5,6 +5,8 @@ library(shinyjs)
 library(ClusterVariable)
 
 server <- function(input, output, session) {
+   #fichier lourd
+  options(shiny.maxRequestSize = 1000 * 1024^2)
 
   disable("coude")
   disable("interpreter")
@@ -73,29 +75,11 @@ server <- function(input, output, session) {
       for (col in names(df)) {
         if (is.numeric(df[[col]])) {
           df[[col]][is.na(df[[col]])] <- mean(df[[col]], na.rm = TRUE)
-        } else {
-          df[[col]][is.na(df[[col]]) | df[[col]] == "" | df[[col]] == "NA"] <- "manquant"
         }
       }
     }
 
-    # --- Outliers : on NE SUPPRIME PAS DE LIGNES !! ---
-    if (input$supprimer_outliers) {
-      for (col in names(df)) {
-        if (is.numeric(df[[col]])) {
 
-          Q1 <- quantile(df[[col]], 0.25, na.rm = TRUE)
-          Q3 <- quantile(df[[col]], 0.75, na.rm = TRUE)
-          IQR <- Q3 - Q1
-
-          low_bound  <- Q1 - 1.5 * IQR
-          high_bound <- Q3 + 1.5 * IQR
-
-          # Remplacement des outliers par NA
-          df[[col]][df[[col]] < low_bound | df[[col]] > high_bound] <- NA
-        }
-      }
-    }
 
     cleaned_data(df)
   })
@@ -172,8 +156,8 @@ server <- function(input, output, session) {
 
     # ---- KMEANS ----
     if (input$method == "kmeans") {
-      model <- clusterVariable$new(k = input$k, data = cleaned_data())
-      model$fit()
+      model <- clusterVariable$new(k = input$k)
+      model$fit(cleaned_data())
 
       model_reactif(model)     # On sauvegarde le modèle
 
@@ -181,7 +165,7 @@ server <- function(input, output, session) {
       enable("Importer")
       enable("interpreter")
 
-      output$Résumé <- renderPrint(model$summary())
+      output$Résumé <- renderPrint(model$print())
     }
 
     # ---- CAH ----
@@ -199,7 +183,7 @@ server <- function(input, output, session) {
       enable("coude")
       enable("Importer")
 
-      output$Résumé <- renderPrint(model$print())
+      output$Résumé <- renderPrint(model$summary())
     }
 
     if(input$method == "ACM") {
@@ -220,7 +204,7 @@ server <- function(input, output, session) {
       model$fit(cleaned_data())
 
       output$afficher_coude <- renderPlot({
-        model$tracer_coude()
+        model$plot_elbow()
       })
     }
     if (input$method == "CAH"){
@@ -252,28 +236,25 @@ server <- function(input, output, session) {
     if (input$method == "kmeans") {
 
       output$qualite <- renderPrint({
-        sil <- model$indice_silhoute()
-        if (is.factor(sil)) sil <- as.numeric(as.character(sil))
-        cat("Silhouette =", round(sil, 4))
+          model$cluster_quality_report()
       })
 
-      output$pca_plot <- renderPlot(model$visualiser_clusters())
-      output$heatmap <- renderPlot(model$heatmap_clusters())
-
-      output$summary_output <- renderPrint({
-        res <- model$resume_cluster()
-        cat("=== Partitions ===\n")
-        print(res$partitions)
-        cat("\n=== Distances intra ===\n")
-        print(res$distances_intra)
-        cat("\n=== Distances inter ===\n")
-        print(res$dist_inter_cluster)
+      #plot
+      output$pca_plot <- renderPlot({
+        model$plot_clusters()
       })
+
+      #heatmap
+      output$heatmap <- renderPlot({
+        model$plot_heatmap()
+      })
+
+
     }
 
     # === CAH ===
     if (input$method == "CAH") {
-      output$summary_output <- renderPrint({
+      output$qualite <- renderPrint({
         model$summary()
       })
     }
