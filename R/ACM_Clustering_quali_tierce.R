@@ -1,680 +1,587 @@
+# =============================================================================
+# MULTIPLE CORRESPONDENCE ANALYSIS (MCA) AND HIERARCHICAL CLUSTERING
+# =============================================================================
 
-#' @title ClusteringACM: Multiple Correspondence Analysis and Variable Clustering
-#'
-#' @description
-#' An R6 class that combines Multiple Correspondence Analysis (MCA) with 
-#' hierarchical clustering of categorical variables. This unified approach 
-#' allows for comprehensive analysis of categorical data, including 
-#' dimensionality reduction and variable grouping based on Cramér's V 
-#' similarity measure.
-#'
-#' @details
-#' The `ClusteringACM` class provides a complete workflow for:
-#' * Multiple Correspondence Analysis using FactoMineR
-#' * Hierarchical clustering of categorical variables
-#' * Visualization of results
-#' * Prediction on new data
-#'
-#' The clustering uses Cramér's V coefficient as a similarity measure between
-#' categorical variables, then applies hierarchical clustering with various
-#' linkage methods (Ward, complete, average, etc.).
-#'
-#' @import R6
-#' @import FactoMineR
-#' @import factoextra
-#' @importFrom stats as.dist hclust cutree chisq.test
-#' @importFrom graphics barplot lines plot rect.hclust
-#' @importFrom utils head tail
-#'
-#' @export
-#' @examples
-#' \dontrun{
-#' # Load data
-#' data(iris)
-#' iris_cat <- data.frame(
-#'   Sepal.Length = cut(iris$Sepal.Length, 3),
-#'   Sepal.Width = cut(iris$Sepal.Width, 3),
-#'   Petal.Length = cut(iris$Petal.Length, 3),
-#'   Petal.Width = cut(iris$Petal.Width, 3),
-#'   Species = iris$Species
-#' )
-#'
-#' # Initialize model with parameters
-#' model <- ClusteringACM$new(
-#'   do_acm = TRUE,
-#'   do_clustering = TRUE,
-#'   ncp = 5,
-#'   graph = FALSE,
-#'   clustering_method = "ward.D2",
-#'   k = 3
-#' )
-#'
-#' # Fit on data
-#' model$fit(iris_cat)
-#'
-#' # Print results
-#' model$print()
-#' model$summary()
-#'
-#' # Visualizations
-#' model$plot_acm(choix = "var")
-#' model$plot_dendrogram()
-#' model$plot_scree()
-#'
-#' # Access results
-#' eigenvalues <- model$get_eigenvalues()
-#' clusters <- model$get_clusters()
-#' }
-ClusteringACM <- R6::R6Class(
-  "ClusteringACM",
-  
-  # ==========================================================================
-  # PUBLIC ATTRIBUTES
-  # ==========================================================================
-  public = list(
-    #' @field data Original data frame
-    data = NULL,
-    
-    #' @field acm_result MCA result object from FactoMineR
-    acm_result = NULL,
-    
-    #' @field acm_params Parameters used for MCA
-    acm_params = NULL,
-    
-    #' @field similarity_matrix Cramér's V similarity matrix between variables
-    similarity_matrix = NULL,
-    
-    #' @field dissim_matrix Dissimilarity matrix (1 - similarity)
-    dissim_matrix = NULL,
-    
-    #' @field hclust_result Hierarchical clustering result
-    hclust_result = NULL,
-    
-    #' @field clusters Cluster assignments for variables
-    clusters = NULL,
-    
-    #' @field variables Variables used for clustering
-    variables = NULL,
-    
-    #' @field method Clustering method (ward.D2, complete, etc.)
-    method = NULL,
-    
-    #' @field n_clusters Number of clusters
-    n_clusters = NULL,
-    
-    #' @field acm_fitted Boolean indicating if MCA has been fitted
-    acm_fitted = FALSE,
-    
-    #' @field clustering_fitted Boolean indicating if clustering has been fitted
-    clustering_fitted = FALSE,
-    
-    
-    # ========================================================================
-    # CONSTRUCTOR
-    # ========================================================================
-    
-    #' @description
-    #' Initialize a new ClusteringACM object
-    #'
-    #' @param do_acm Logical, perform MCA (default: TRUE)
-    #' @param do_clustering Logical, perform clustering (default: TRUE)
-    #' @param ncp Number of dimensions to keep in MCA (default: 5)
-    #' @param ind.sup Vector of supplementary individuals
-    #' @param quanti.sup Vector of supplementary quantitative variables
-    #' @param quali.sup Vector of supplementary qualitative variables
-    #' @param excl Vector indicating categories to exclude
-    #' @param graph Logical, whether to display graphs (default: FALSE)
-    #' @param level.ventil Threshold for grouping rare categories
-    #' @param axes Axes to plot (default: c(1, 2))
-    #' @param row.w Row weights for MCA
-    #' @param method MCA method: "Indicator" or "Burt" (default: "Indicator")
-    #' @param na.method How to handle missing values (default: "NA")
-    #' @param tab.disj Pre-computed indicator matrix
-    #' @param variables Variables to use for clustering (default: all)
-    #' @param clustering_method Hierarchical clustering method 
-    #'   (default: "ward.D2"). Options: "ward.D2", "ward.D", "single", 
-    #'   "complete", "average", "mcquitty", "median", "centroid"
-    #' @param k Number of clusters to create (optional)
-    #'
-    #' @return A new ClusteringACM object
-    initialize = function(do_acm = TRUE,
-                          do_clustering = TRUE,
-                          ncp = 5,
-                          ind.sup = NULL,
-                          quanti.sup = NULL,
-                          quali.sup = NULL,
-                          excl = NULL,
-                          graph = FALSE,
-                          level.ventil = 0,
-                          axes = c(1, 2),
-                          row.w = NULL,
-                          method = "Indicator",
-                          na.method = "NA",
-                          tab.disj = NULL,
-                          variables = NULL,
-                          clustering_method = "ward.D2",
-                          k = NULL) {
-      
-      # Stockage des options de fit
-      private$do_acm <- do_acm
-      private$do_clustering <- do_clustering
-      private$clustering_vars <- variables
-      private$clustering_k <- k
-      
-      # Stockage des paramètres ACM
-      self$acm_params <- list(
-        ncp = ncp,
-        ind.sup = ind.sup,
-        quanti.sup = quanti.sup,
-        quali.sup = quali.sup,
-        excl = excl,
-        graph = graph,
-        level.ventil = level.ventil,
-        axes = axes,
-        row.w = row.w,
-        method = method,
-        na.method = na.method,
-        tab.disj = tab.disj
-      )
-      
-      # Stockage de la méthode de clustering
-      self$method <- clustering_method
-      self$n_clusters <- k
-      
-      message("ClusteringACM initialized")
-      message("  • MCA: ", ifelse(do_acm, "enabled", "disabled"))
-      message("  • Clustering: ", ifelse(do_clustering, "enabled", "disabled"))
-      if (do_clustering && !is.null(k)) {
-        message("  • Number of clusters: ", k)
-      }
-      
-      invisible(self)
-    },
-    
-    
-    # ========================================================================
-    # FIT METHOD
-    # ========================================================================
-    
-    #' @description
-    #' Fit the model on data
-    #'
-    #' @param X A data frame with categorical variables to analyze
-    #'
-    #' @return Self (invisibly) for method chaining
-    #' 
-    #' @examples
-    #' \dontrun{
-    #' # Initialize with parameters
-    #' model <- ClusteringACM$new(
-    #'   do_acm = TRUE,
-    #'   do_clustering = TRUE,
-    #'   ncp = 5,
-    #'   clustering_method = "ward.D2",
-    #'   k = 3
-    #' )
-    #' 
-    #' # Fit on data
-    #' model$fit(my_data)
-    #' }
-    fit = function(X) {
-      
-      # Validation des données
-      if (!is.data.frame(X)) {
-        stop("X must be a data frame")
-      }
-      
-      # Stockage des données
-      self$data <- X
-      
-      message("Fitting model on data with ", 
-              nrow(X), " individuals and ", 
-              ncol(X), " variables")
-      
-      # Récupération des paramètres d'initialisation
-      do_acm <- private$do_acm
-      do_clustering <- private$do_clustering
-      variables <- private$clustering_vars
-      k <- private$clustering_k
-      
-      # --- STEP 1: MCA ---
-      if (do_acm) {
-        message(">>> Fitting MCA...")
-        self$acm_result <- do.call(FactoMineR::MCA, 
-                                   c(list(X = self$data), self$acm_params))
-        self$acm_fitted <- TRUE
-        message("    MCA fitted successfully")
-      }
-      
-      # --- STEP 2: Variable clustering ---
-      if (do_clustering) {
-        message(">>> Computing variable clustering...")
-        
-        if (is.null(variables)) {
-          self$variables <- names(self$data)
-        } else {
-          self$variables <- variables
-        }
-        
-        # Convert to factors if needed
-        for (var in self$variables) {
-          if (!is.factor(self$data[[var]])) {
-            self$data[[var]] <- as.factor(self$data[[var]])
-          }
-        }
-        
-        # Compute similarity matrix (Cramér's V)
-        n_vars <- length(self$variables)
-        sim_mat <- matrix(1, nrow = n_vars, ncol = n_vars)
-        rownames(sim_mat) <- self$variables
-        colnames(sim_mat) <- self$variables
-        
-        message("    Computing similarity matrix...")
-        for (i in 1:(n_vars - 1)) {
-          for (j in (i + 1):n_vars) {
-            sim_mat[i, j] <- private$cramer(
-              self$data[[self$variables[i]]], 
-              self$data[[self$variables[j]]]
-            )
-            sim_mat[j, i] <- sim_mat[i, j]
-          }
-        }
-        
-        self$similarity_matrix <- sim_mat
-        self$dissim_matrix <- as.dist(1 - sim_mat)
-        
-        # Hierarchical clustering
-        message("    Hierarchical clustering (method: ", clustering_method, ")...")
-        self$method <- clustering_method
-        self$hclust_result <- hclust(self$dissim_matrix, method = clustering_method)
-        
-        # Cut tree if k specified
-        if (!is.null(k)) {
-          self$n_clusters <- k
-          self$clusters <- cutree(self$hclust_result, k = k)
-          message("    Clusters created: ", k, " groups")
-        }
-        
-        self$clustering_fitted <- TRUE
-        message("    Clustering fitted successfully")
-      }
-      
-      message("\n=== Model fitted successfully ===")
-      invisible(self)
-    },
-    
-    
-    # ========================================================================
-    # PREDICT METHOD
-    # ========================================================================
-    
-    #' @description
-    #' Predict cluster membership for new individuals or variables
-    #'
-    #' @param new_data Data frame with new observations
-    #' @param new_variables Variables to predict (for type = "variables")
-    #' @param type Type of prediction: "individuals" or "variables"
-    #'
-    #' @return Predictions (format depends on type)
-    predict = function(new_data = NULL, 
-                       new_variables = NULL,
-                       type = c("individuals", "variables")) {
-      
-      type <- match.arg(type)
-      
-      if (type == "individuals") {
-        return(private$predict_individuals(new_data))
-      } else {
-        return(private$predict_variables(new_data, new_variables))
-      }
-    },
-    
-    
-    # ========================================================================
-    # PRINT METHOD
-    # ========================================================================
-    
-    #' @description
-    #' Print model summary
-    print = function() {
-      cat("╔════════════════════════════════════════════════════════════╗\n")
-      cat("║          ClusteringACM - Factorial Analysis Model         ║\n")
-      cat("╚════════════════════════════════════════════════════════════╝\n\n")
-      
-      cat("📊 DATA\n")
-      cat("   • Number of individuals:", nrow(self$data), "\n")
-      cat("   • Number of variables:", ncol(self$data), "\n\n")
-      
-      cat("🔍 MULTIPLE CORRESPONDENCE ANALYSIS (MCA)\n")
-      if (self$acm_fitted) {
-        cat("   • Status: ✓ Fitted\n")
-        cat("   • Dimensions:", self$acm_params$ncp, "\n")
-        cat("   • Method:", self$acm_params$method, "\n")
-        
-        eig <- self$acm_result$eig
-        cat("   • Explained variance (first 3 dimensions):\n")
-        for (i in 1:min(3, nrow(eig))) {
-          cat(sprintf("     - Dim %d: %.2f%%\n", i, eig[i, 2]))
-        }
-      } else {
-        cat("   • Status: ✗ Not fitted\n")
-      }
-      cat("\n")
-      
-      cat("🌳 HIERARCHICAL VARIABLE CLUSTERING\n")
-      if (self$clustering_fitted) {
-        cat("   • Status: ✓ Fitted\n")
-        cat("   • Method:", self$method, "\n")
-        cat("   • Variables analyzed:", length(self$variables), "\n")
-        
-        if (!is.null(self$n_clusters)) {
-          cat("   • Number of clusters:", self$n_clusters, "\n")
-          cat("   • Cluster composition:\n")
-          
-          for (i in 1:self$n_clusters) {
-            vars_in_cluster <- names(self$clusters)[self$clusters == i]
-            cat(sprintf("     - Cluster %d (%d var): %s\n", 
-                        i, 
-                        length(vars_in_cluster),
-                        paste(vars_in_cluster, collapse = ", ")))
-          }
-          
-          cat(sprintf("   • Last fusion height: %.4f\n", 
-                      tail(self$hclust_result$height, 1)))
-        } else {
-          cat("   • Number of clusters: not specified\n")
-        }
-      } else {
-        cat("   • Status: ✗ Not fitted\n")
-      }
-      
-      cat("\n")
-      cat("💡 Use fit() to fit the model\n")
-      cat("💡 Use predict() for predictions\n")
-      
-      invisible(self)
-    },
-    
-    
-    # ========================================================================
-    # MCA METHODS
-    # ========================================================================
-    
-    #' @description Get eigenvalues from MCA
-    #' @return Matrix of eigenvalues with variance percentages
-    get_eigenvalues = function() {
-      if (!self$acm_fitted) stop("MCA not fitted. Use fit()")
-      return(self$acm_result$eig)
-    },
-    
-    #' @description Get variable coordinates from MCA
-    #' @param axes Axes to extract (default: c(1, 2))
-    #' @return Matrix of variable coordinates
-    get_var_coords = function(axes = c(1, 2)) {
-      if (!self$acm_fitted) stop("MCA not fitted. Use fit()")
-      return(self$acm_result$var$coord[, axes, drop = FALSE])
-    },
-    
-    #' @description Get variable contributions from MCA
-    #' @param axes Axes to extract (default: c(1, 2))
-    #' @return Matrix of variable contributions
-    get_var_contrib = function(axes = c(1, 2)) {
-      if (!self$acm_fitted) stop("MCA not fitted. Use fit()")
-      return(self$acm_result$var$contrib[, axes, drop = FALSE])
-    },
-    
-    #' @description Get variable cos2 (quality of representation) from MCA
-    #' @param axes Axes to extract (default: c(1, 2))
-    #' @return Matrix of cos2 values
-    get_var_cos2 = function(axes = c(1, 2)) {
-      if (!self$acm_fitted) stop("MCA not fitted. Use fit()")
-      return(self$acm_result$var$cos2[, axes, drop = FALSE])
-    },
-    
-    #' @description Get individual coordinates from MCA
-    #' @param axes Axes to extract (default: c(1, 2))
-    #' @return Matrix of individual coordinates
-    get_ind_coords = function(axes = c(1, 2)) {
-      if (!self$acm_fitted) stop("MCA not fitted. Use fit()")
-      return(self$acm_result$ind$coord[, axes, drop = FALSE])
-    },
-    
-    
-    # ========================================================================
-    # CLUSTERING METHODS
-    # ========================================================================
-    
-    #' @description Get similarity matrix (Cramér's V)
-    #' @return Similarity matrix between variables
-    get_similarity_matrix = function() {
-      if (!self$clustering_fitted) {
-        stop("Clustering not fitted. Use fit()")
-      }
-      return(self$similarity_matrix)
-    },
-    
-    #' @description Get cluster assignments
-    #' @return Named vector of cluster assignments
-    get_clusters = function() {
-      if (!self$clustering_fitted || is.null(self$clusters)) {
-        stop("Clustering not fitted or k not specified. Use fit(k = ...)")
-      }
-      return(self$clusters)
-    },
-    
-    
-    # ========================================================================
-    # VISUALIZATION METHODS
-    # ========================================================================
-    
-    #' @description Plot MCA results
-    #' @param choix Type of plot: "ind" or "var"
-    #' @param axes Axes to plot (default: c(1, 2))
-    #' @param ... Additional arguments passed to plot.MCA
-    plot_acm = function(choix = "ind", axes = c(1, 2), ...) {
-      if (!self$acm_fitted) stop("MCA not fitted. Use fit()")
-      plot.MCA(self$acm_result, choix = choix, axes = axes, ...)
-    },
-    
-    #' @description Plot dendrogram
-    #' @param k Number of clusters to highlight (optional)
-    plot_dendrogram = function(k = NULL) {
-      if (!self$clustering_fitted) {
-        stop("Clustering not fitted. Use fit()")
-      }
-      
-      k_to_use <- if (is.null(k)) self$n_clusters else k
-      
-      plot(self$hclust_result, 
-           main = "Dendrogram - Variable Clustering",
-           xlab = "Variables", 
-           ylab = "Distance (1 - Cramér's V)",
-           sub = paste("Method:", self$method))
-      
-      if (!is.null(k_to_use)) {
-        rect.hclust(self$hclust_result, k = k_to_use, border = 2:6)
-      }
-    },
-    
-    #' @description Plot scree plot (variance explained)
-    plot_scree = function() {
-      if (!self$acm_fitted) stop("MCA not fitted. Use fit()")
-      
-      eig <- self$acm_result$eig
-      barplot(eig[, 2], 
-              names.arg = 1:nrow(eig),
-              main = "Scree plot - Explained variance",
-              xlab = "Dimensions",
-              ylab = "Percentage of variance (%)",
-              col = "steelblue")
-      lines(x = 1:nrow(eig), y = eig[, 2], type = "b", col = "red", pch = 19)
-    },
-    
-    
-    # ========================================================================
-    # SUMMARY METHOD
-    # ========================================================================
-    
-    #' @description Print detailed summary
-    summary = function() {
-      cat("\n")
-      cat("═══════════════════════════════════════════════════════════════\n")
-      cat("                ClusteringACM MODEL SUMMARY                    \n")
-      cat("═══════════════════════════════════════════════════════════════\n\n")
-      
-      if (self$acm_fitted) {
-        cat("--- MULTIPLE CORRESPONDENCE ANALYSIS ---\n\n")
-        cat("Dimensions:", self$acm_params$ncp, "\n")
-        cat("Method:", self$acm_params$method, "\n\n")
-        
-        cat("Eigenvalues (explained variance):\n")
-        eig <- self$acm_result$eig
-        print(head(eig, 10))
-        cat("\n")
-      }
-      
-      if (self$clustering_fitted) {
-        cat("--- HIERARCHICAL CLUSTERING ---\n\n")
-        cat("Method:", self$method, "\n")
-        cat("Variables:", length(self$variables), "\n")
-        
-        if (!is.null(self$n_clusters)) {
-          cat("Clusters:", self$n_clusters, "\n\n")
-          
-          cat("Detailed composition:\n")
-          for (i in 1:self$n_clusters) {
-            vars <- names(self$clusters)[self$clusters == i]
-            cat("Cluster", i, ":\n")
-            cat("  ", paste(vars, collapse = ", "), "\n\n")
-          }
-        }
-      }
-      
-      invisible(self)
-    }
-  ),
-  
-  
-  # ==========================================================================
-  # PRIVATE METHODS
-  # ==========================================================================
-  private = list(
-    
-    # Options de fit
-    do_acm = TRUE,
-    do_clustering = TRUE,
-    clustering_vars = NULL,
-    clustering_k = NULL,
-    
-    # Cramér's V coefficient
-    cramer = function(y, x, print_chi2 = FALSE) {
-      if (!is.factor(y)) y <- as.factor(y)
-      if (!is.factor(x)) x <- as.factor(x)
-      
-      K <- nlevels(y)
-      L <- nlevels(x)
-      n <- length(y)
-      
-      chi2 <- chisq.test(y, x, correct = FALSE)
-      
-      if (print_chi2) print(chi2$statistic)
-      
-      v <- sqrt(chi2$statistic / (n * min(K - 1, L - 1)))
-      return(as.numeric(v))
-    },
-    
-    
-    # Prediction for new individuals (MCA projection)
-    predict_individuals = function(new_data) {
-      if (!self$acm_fitted) {
-        stop("MCA not fitted. Use fit() first")
-      }
-      
-      if (is.null(new_data)) {
-        stop("new_data cannot be NULL for predicting individuals")
-      }
-      
-      if (!all(names(new_data) %in% names(self$data))) {
-        stop("new_data must contain the same variables as training data")
-      }
-      
-      for (var in names(new_data)) {
-        if (!is.factor(new_data[[var]])) {
-          new_data[[var]] <- as.factor(new_data[[var]])
-        }
-      }
-      
-      coords <- self$acm_result$var$coord
-      
-      message("Projecting ", nrow(new_data), " new individuals")
-      
-      return(list(
-        message = "Full MCA projection not implemented",
-        method = "Use predict.MCA from FactoMineR for complete projection"
-      ))
-    },
-    
-    
-    # Prediction for new variables (clustering)
-    predict_variables = function(new_data, new_variables = NULL) {
-      if (!self$clustering_fitted) {
-        stop("Clustering not fitted. Use fit() first")
-      }
-      
-      if (is.null(self$clusters)) {
-        stop("Number of clusters must be specified in fit() to use predict()")
-      }
-      
-      if (is.null(new_data)) {
-        stop("new_data cannot be NULL for predicting variables")
-      }
-      
-      if (is.null(new_variables)) {
-        new_variables <- names(new_data)
-      }
-      
-      for (var in new_variables) {
-        if (!is.factor(new_data[[var]])) {
-          new_data[[var]] <- as.factor(new_data[[var]])
-        }
-      }
-      
-      cluster_centers <- private$compute_cluster_centers()
-      
-      predictions <- sapply(new_variables, function(new_var) {
-        similarities <- sapply(names(cluster_centers), function(center_var) {
-          private$cramer(new_data[[new_var]], self$data[[center_var]])
-        })
-        cluster_centers[which.max(similarities)]
-      })
-      
-      message("Prediction done for ", length(new_variables), " variable(s)")
-      return(predictions)
-    },
-    
-    
-    # Compute cluster centers
-    compute_cluster_centers = function() {
-      centers <- sapply(1:self$n_clusters, function(cluster_id) {
-        vars_in_cluster <- names(self$clusters)[self$clusters == cluster_id]
-        
-        if (length(vars_in_cluster) == 1) {
-          return(vars_in_cluster)
-        }
-        
-        avg_similarities <- sapply(vars_in_cluster, function(var1) {
-          mean(sapply(vars_in_cluster[vars_in_cluster != var1], function(var2) {
-            self$similarity_matrix[var1, var2]
-          }))
-        })
-        
-        return(vars_in_cluster[which.max(avg_similarities)])
-      })
-      
-      names(centers) <- 1:self$n_clusters
-      return(centers)
-    }
-  )
+library(FactoMineR)
+library(factoextra)
+library(cluster)
+library(ggplot2)
+library(dplyr)
+library(R6)
+
+ACMClustering <- R6Class("ACMClustering",
+                         public = list(
+                           # Attributes
+                           n_components = NULL,
+                           mca_result = NULL,
+                           coord_ind = NULL,
+                           coord_mod = NULL,
+                           eigenvalues = NULL,
+                           inertia_explained = NULL,
+                           labels_mod = NULL,
+                           labels_var = NULL,
+                           data = NULL,
+                           modality_names = NULL,
+                           variable_names = NULL,
+                           cluster_centers = NULL,
+                           clustering_method = NULL,
+                           
+                           # Constructor
+                           initialize = function(n_components = 5) {
+                             self$n_components <- n_components
+                             cat("ACMClustering initialized with", n_components, "components\n")
+                             cat("MODE: HIERARCHICAL clustering on MODALITIES (variables)\n")
+                           },
+                           
+                           # Method to perform MCA
+                           fit = function(df) {
+                             cat("\n========================================\n")
+                             cat("EXECUTING MCA\n")
+                             cat("========================================\n")
+                             
+                             df <- as.data.frame(lapply(df, as.factor))
+                             self$data <- df
+                             
+                             self$mca_result <- MCA(df, 
+                                                    ncp = self$n_components, 
+                                                    graph = FALSE)
+                             
+                             self$coord_ind <- self$mca_result$ind$coord
+                             self$coord_mod <- self$mca_result$var$coord
+                             
+                             self$modality_names <- rownames(self$coord_mod)
+                             self$variable_names <- names(df)
+                             
+                             self$eigenvalues <- self$mca_result$eig[, 1]
+                             self$inertia_explained <- self$mca_result$eig[, 2]
+                             
+                             n_vars <- ncol(df)
+                             n_modalities <- nrow(self$coord_mod)
+                             cat(sprintf("\nMCA performed on %d individuals and %d variables\n", 
+                                         nrow(df), n_vars))
+                             cat(sprintf("Total number of modalities: %d\n", n_modalities))
+                             cat(sprintf("\nInertia explained (cumulative) by %d components: %.2f%%\n",
+                                         self$n_components,
+                                         sum(self$inertia_explained[1:self$n_components])))
+                             
+                             cat("\nModalities by variable:\n")
+                             for (var in names(df)) {
+                               cat(sprintf("  - %s: %s\n", var, paste(levels(df[[var]]), collapse = ", ")))
+                             }
+                             
+                             invisible(self)
+                           },
+                           
+                           # Hierarchical Agglomerative Clustering (HAC) on MODALITIES
+                           clustering_hierarchical = function(n_clusters, method = "ward") {
+                             cat("\n========================================\n")
+                             cat("HIERARCHICAL CLUSTERING ON MODALITIES\n")
+                             cat("========================================\n")
+                             
+                             dist_matrix <- dist(self$coord_mod)
+                             
+                             if (method == "ward") {
+                               hc <- hclust(dist_matrix, method = "ward.D2")
+                             } else {
+                               hc <- hclust(dist_matrix, method = method)
+                             }
+                             
+                             self$labels_mod <- cutree(hc, k = n_clusters)
+                             names(self$labels_mod) <- self$modality_names
+                             self$clustering_method <- "hierarchical"
+                             
+                             # Calculate cluster centers
+                             self$cluster_centers <- matrix(0, nrow = n_clusters, ncol = ncol(self$coord_mod))
+                             for (i in 1:n_clusters) {
+                               cluster_points <- self$coord_mod[self$labels_mod == i, , drop = FALSE]
+                               self$cluster_centers[i, ] <- colMeans(cluster_points)
+                             }
+                             colnames(self$cluster_centers) <- colnames(self$coord_mod)
+                             
+                             #sil <- silhouette(self$labels_mod, dist_matrix)
+                             #sil_score <- mean(sil[, 3])
+                             
+                             cat(sprintf("\nHAC with %d clusters (method: %s)\n", n_clusters, method))
+                             #cat(sprintf("Silhouette score: %.3f\n", sil_score))
+                             cat("\nDistribution of modalities by cluster:\n")
+                             print(table(self$labels_mod))
+                             
+                             cat("\nModalities by cluster:\n")
+                             for (i in 1:n_clusters) {
+                               cat(sprintf("\nCluster %d:\n", i))
+                               modalities_in_cluster <- names(self$labels_mod[self$labels_mod == i])
+                               for (mod in modalities_in_cluster) {
+                                 cat(sprintf("  - %s\n", mod))
+                               }
+                             }
+                             
+                             plot(hc, main = "Dendrogram - Modality Classification",
+                                  xlab = "Modalities", ylab = "Distance", 
+                                  labels = self$modality_names,
+                                  sub = "", cex = 0.7)
+                             rect.hclust(hc, k = n_clusters, border = 2:5)
+                             
+                             return(self$labels_mod)
+                           },
+                           
+                           # PREDICT FUNCTION
+                           predict = function(new_data) {
+                             cat("\n========================================\n")
+                             cat("PREDICTING CLUSTERS FOR NEW DATA\n")
+                             cat("========================================\n")
+                             
+                             # Checks
+                             if (is.null(self$mca_result)) {
+                               stop("Error: You must first run fit() before predicting.")
+                             }
+                             
+                             if (is.null(self$labels_mod)) {
+                               stop("Error: You must first run clustering_hierarchical() before predicting.")
+                             }
+                             
+                             # Convert to data frame and factors
+                             new_data <- as.data.frame(new_data)
+                             
+                             # Check that columns match
+                             if (!all(names(new_data) %in% self$variable_names)) {
+                               stop("Error: Variables in new_data must match the variables of the trained model.")
+                             }
+                             
+                             # Reorder columns
+                             new_data <- new_data[, self$variable_names, drop = FALSE]
+                             
+                             # Convert to factors with the same levels as training data
+                             for (var in self$variable_names) {
+                               original_levels <- levels(self$data[[var]])
+                               new_data[[var]] <- factor(new_data[[var]], levels = original_levels)
+                               
+                               # Check for unknown modalities
+                               unknown_levels <- setdiff(unique(as.character(new_data[[var]])), original_levels)
+                               if (length(unknown_levels) > 0) {
+                                 warning(sprintf("Variable '%s' contains unknown modalities: %s. They will be treated as NA.",
+                                                 var, paste(unknown_levels, collapse = ", ")))
+                               }
+                             }
+                             
+                             cat(sprintf("\nPredicting for %d new individuals\n", nrow(new_data)))
+                             
+                             # Project new individuals into factorial space
+                             new_coords <- predict(self$mca_result, newdata = new_data)$coord
+                             
+                             cat(sprintf("Projection performed on %d dimensions\n", ncol(new_coords)))
+                             
+                             # For each individual, find activated modalities and their cluster
+                             predictions <- data.frame(
+                               individual = 1:nrow(new_data),
+                               predicted_cluster = NA,
+                               distance_to_center = NA
+                             )
+                             
+                             # Create a dictionary of clusters by modality
+                             for (i in 1:nrow(new_data)) {
+                               # Identify active modalities for this individual
+                               active_modalities <- c()
+                               for (var in self$variable_names) {
+                                 value <- as.character(new_data[i, var])
+                                 if (!is.na(value)) {
+                                   modality_name <- paste0(var, "_", value)
+                                   active_modalities <- c(active_modalities, modality_name)
+                                 }
+                               }
+                               
+                               # Retrieve clusters of active modalities
+                               clusters_of_modalities <- self$labels_mod[active_modalities]
+                               clusters_of_modalities <- clusters_of_modalities[!is.na(clusters_of_modalities)]
+                               
+                               if (length(clusters_of_modalities) > 0) {
+                                 # Majority vote: most frequent cluster
+                                 predicted_cluster <- as.numeric(names(sort(table(clusters_of_modalities), decreasing = TRUE)[1]))
+                               } else {
+                                 # If no known modality, use distance to centers
+                                 distances <- apply(self$cluster_centers, 1, function(center) {
+                                   sqrt(sum((new_coords[i, 1:ncol(self$cluster_centers)] - center)^2))
+                                 })
+                                 predicted_cluster <- which.min(distances)
+                               }
+                               
+                               # Calculate distance to predicted cluster center
+                               center <- self$cluster_centers[predicted_cluster, ]
+                               distance <- sqrt(sum((new_coords[i, 1:length(center)] - center)^2))
+                               
+                               predictions$predicted_cluster[i] <- predicted_cluster
+                               predictions$distance_to_center[i] <- distance
+                             }
+                             
+                             # Display results
+                             cat("\nPrediction summary:\n")
+                             print(table(predictions$predicted_cluster))
+                             
+                             cat("\nAverage distance to cluster center by predicted cluster:\n")
+                             avg_distances <- aggregate(distance_to_center ~ predicted_cluster, 
+                                                        data = predictions, 
+                                                        FUN = mean)
+                             print(avg_distances)
+                             
+                             # Display first predictions
+                             cat("\nFirst predictions:\n")
+                             result_display <- cbind(new_data[1:min(10, nrow(new_data)), ], 
+                                                     predictions[1:min(10, nrow(new_data)), ])
+                             print(result_display)
+                             
+                             # Return results
+                             return(list(
+                               predictions = predictions,
+                               coordinates = new_coords
+                             ))
+                           },
+                           
+                           # Eigenvalues plot (scree plot)
+                           plot_scree = function() {
+                             cat("\n========================================\n")
+                             cat("EIGENVALUES PLOT\n")
+                             cat("========================================\n")
+                             
+                             n_eig <- min(10, length(self$eigenvalues))
+                             eig_df <- data.frame(
+                               Dimension = 1:n_eig,
+                               Eigenvalue = self$eigenvalues[1:n_eig],
+                               Variance = self$inertia_explained[1:n_eig],
+                               Cumulative = cumsum(self$inertia_explained[1:n_eig])
+                             )
+                             
+                             p1 <- ggplot(eig_df, aes(x = Dimension, y = Eigenvalue)) +
+                               geom_bar(stat = "identity", fill = "steelblue") +
+                               labs(title = "Eigenvalues",
+                                    x = "Dimension",
+                                    y = "Eigenvalue") +
+                               theme_minimal() +
+                               theme(panel.grid.minor = element_blank())
+                             
+                             p2 <- ggplot(eig_df, aes(x = Dimension, y = Cumulative)) +
+                               geom_line(color = "darkred", linewidth = 1) +
+                               geom_point(color = "darkred", size = 3) +
+                               labs(title = "Cumulative explained inertia",
+                                    x = "Dimension",
+                                    y = "% Cumulative inertia") +
+                               theme_minimal() +
+                               theme(panel.grid.minor = element_blank())
+                             
+                             # Display plots
+                             print(p1)
+                             print(p2)
+                             
+                             invisible(self)
+                           },
+                           
+                           # Visualize MODALITIES in factorial plane
+                           plot_modalities = function(axes = c(1, 2), labels = NULL, show_variables = TRUE) {
+                             cat("\n========================================\n")
+                             cat("MODALITY PROJECTION\n")
+                             cat("========================================\n")
+                             
+                             plot_df <- data.frame(
+                               Dim1 = self$coord_mod[, axes[1]],
+                               Dim2 = self$coord_mod[, axes[2]],
+                               Modality = self$modality_names
+                             )
+                             
+                             if (show_variables) {
+                               plot_df$Variable <- sapply(strsplit(self$modality_names, "_"), `[`, 1)
+                             }
+                             
+                             if (!is.null(labels)) {
+                               plot_df$Cluster <- as.factor(labels)
+                             }
+                             
+                             p <- ggplot(plot_df, aes(x = Dim1, y = Dim2))
+                             
+                             if (!is.null(labels)) {
+                               p <- p + 
+                                 geom_point(aes(color = Cluster), alpha = 0.7, size = 3) +
+                                 scale_color_viridis_d() +
+                                 labs(color = "Cluster")
+                             } else if (show_variables) {
+                               p <- p + 
+                                 geom_point(aes(color = Variable), alpha = 0.7, size = 3) +
+                                 scale_color_brewer(palette = "Set2") +
+                                 labs(color = "Variable")
+                             } else {
+                               p <- p + geom_point(alpha = 0.7, size = 3, color = "steelblue")
+                             }
+                             
+                             p <- p +
+                               ggrepel::geom_text_repel(aes(label = Modality), size = 3, max.overlaps = 15) +
+                               geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.5) +
+                               geom_vline(xintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.5) +
+                               labs(
+                                 title = "Projection of modalities in factorial plane",
+                                 x = sprintf("Dim %d (%.2f%%)", axes[1], self$inertia_explained[axes[1]]),
+                                 y = sprintf("Dim %d (%.2f%%)", axes[2], self$inertia_explained[axes[2]])
+                               ) +
+                               theme_minimal() +
+                               theme(panel.grid.minor = element_blank())
+                             
+                             print(p)
+                             invisible(self)
+                           },
+                           
+                           # Evaluation method with hierarchical clustering
+                           elbow_method = function(max_clusters = 10, method = "ward") {
+                             cat("\n========================================\n")
+                             cat("EVALUATING OPTIMAL NUMBER OF CLUSTERS\n")
+                             cat("========================================\n")
+                             
+                             n_modalities <- nrow(self$coord_mod)
+                             max_clusters <- min(max_clusters, n_modalities - 1)
+                             
+                             dist_matrix <- dist(self$coord_mod)
+                             
+                             if (method == "ward") {
+                               hc <- hclust(dist_matrix, method = "ward.D2")
+                             } else {
+                               hc <- hclust(dist_matrix, method = method)
+                             }
+                             
+                             inertias <- numeric(max_clusters - 1)
+                             
+                             
+                             for (k in 2:max_clusters) {
+                               clusters <- cutree(hc, k = k)
+                               
+                               # Calculate within-cluster inertia
+                               total_inertia <- 0
+                               for (i in 1:k) {
+                                 cluster_points <- self$coord_mod[clusters == i, , drop = FALSE]
+                                 if (nrow(cluster_points) > 0) {
+                                   center <- colMeans(cluster_points)
+                                   total_inertia <- total_inertia + sum(apply(cluster_points, 1, function(x) sum((x - center)^2)))
+                                 }
+                               }
+                               inertias[k - 1] <- total_inertia
+                               
+                               
+                             }
+                             
+                             elbow_df <- data.frame(
+                               K = 2:max_clusters,
+                               Inertia = inertias
+                               
+                             )
+                             
+                             p1 <- ggplot(elbow_df, aes(x = K, y = Inertia)) +
+                               geom_line(color = "steelblue", linewidth = 1) +
+                               geom_point(color = "steelblue", size = 3) +
+                               labs(title = "Elbow method (modalities - HAC)",
+                                    x = "Number of clusters",
+                                    y = "Within-cluster inertia") +
+                               scale_x_continuous(breaks = 2:max_clusters) +
+                               theme_minimal()
+                             
+                             
+                             
+                             # Display plots
+                             print(p1)
+                             #print(p2)
+                             
+                             invisible(self)
+                           },
+                           
+                           # PRINT method inspired by FactoMineR
+                           print = function() {
+                             cat("\n")
+                             cat("**Results of Multiple Correspondence Analysis (MCA) with Clustering**\n")
+                             
+                             if (!is.null(self$data)) {
+                               cat(sprintf("The analysis was performed on %d individuals, described by %d variables\n", 
+                                           nrow(self$data), ncol(self$data)))
+                             }
+                             
+                             cat("*The results are available in the following objects:\n\n")
+                             
+                             # Create results table
+                             results_table <- data.frame(
+                               nom = character(),
+                               description = character(),
+                               stringsAsFactors = FALSE
+                             )
+                             
+                             idx <- 1
+                             
+                             # MCA results
+                             if (!is.null(self$mca_result)) {
+                               results_table[idx, ] <- c("$mca_result", "complete MCA results (FactoMineR)")
+                               idx <- idx + 1
+                               results_table[idx, ] <- c("$eigenvalues", "eigenvalues")
+                               idx <- idx + 1
+                               results_table[idx, ] <- c("$inertia_explained", "percentage of explained inertia")
+                               idx <- idx + 1
+                             }
+                             
+                             # Coordinates
+                             if (!is.null(self$coord_ind)) {
+                               results_table[idx, ] <- c("$coord_ind", "coordinates of individuals")
+                               idx <- idx + 1
+                             }
+                             
+                             if (!is.null(self$coord_mod)) {
+                               results_table[idx, ] <- c("$coord_mod", "coordinates of modalities")
+                               idx <- idx + 1
+                             }
+                             
+                             # Information about modalities and variables
+                             if (!is.null(self$modality_names)) {
+                               results_table[idx, ] <- c("$modality_names", "names of modalities")
+                               idx <- idx + 1
+                             }
+                             
+                             if (!is.null(self$variable_names)) {
+                               results_table[idx, ] <- c("$variable_names", "names of variables")
+                               idx <- idx + 1
+                             }
+                             
+                             # Clustering results
+                             if (!is.null(self$labels_mod)) {
+                               results_table[idx, ] <- c("$labels_mod", "cluster labels for modalities")
+                               idx <- idx + 1
+                               results_table[idx, ] <- c("$cluster_centers", "cluster centers")
+                               idx <- idx + 1
+                               results_table[idx, ] <- c("$clustering_method", sprintf("clustering method (%s)", self$clustering_method))
+                               idx <- idx + 1
+                             }
+                             
+                             # Data
+                             if (!is.null(self$data)) {
+                               results_table[idx, ] <- c("$data", "training data")
+                               idx <- idx + 1
+                             }
+                             
+                             # Display table with alignment
+                             max_name_length <- max(nchar(results_table$nom))
+                             
+                             for (i in 1:nrow(results_table)) {
+                               cat(sprintf("  %-*s  %s\n", 
+                                           max_name_length, 
+                                           results_table$nom[i], 
+                                           results_table$description[i]))
+                             }
+                             
+                             # Additional information
+                             if (!is.null(self$mca_result)) {
+                               cat(sprintf("\n*Principal components: %d\n", self$n_components))
+                               cat(sprintf("*Total explained inertia: %.2f%%\n", 
+                                           sum(self$inertia_explained[1:min(self$n_components, length(self$inertia_explained))])))
+                             }
+                             
+                             if (!is.null(self$labels_mod)) {
+                               n_clusters <- max(self$labels_mod)
+                               cat(sprintf("\n*Clustering performed: %d clusters (method: %s)\n", 
+                                           n_clusters, self$clustering_method))
+                               cat(sprintf("*Total number of modalities: %d\n", length(self$labels_mod)))
+                             }
+                             
+                             cat("\n")
+                             invisible(self)
+                           },
+                           
+                           # Summary of modality clusters
+                           summary = function() {
+                             if (is.null(self$labels_mod)) {
+                               cat("No clustering has been performed. Use clustering_hierarchical().\n")
+                               return(invisible(self))
+                             }
+                             
+                             cat("\n========================================\n")
+                             cat("SUMMARY OF MODALITY CLUSTERS\n")
+                             cat("========================================\n")
+                             
+                             n_clusters <- max(self$labels_mod)
+                             
+                             for (i in 1:n_clusters) {
+                               modalities <- names(self$labels_mod[self$labels_mod == i])
+                               cat(sprintf("\n--- CLUSTER %d (%d modalities) ---\n", i, length(modalities)))
+                               
+                               mod_by_var <- list()
+                               for (mod in modalities) {
+                                 var_name <- strsplit(mod, "_")[[1]][1]
+                                 if (is.null(mod_by_var[[var_name]])) {
+                                   mod_by_var[[var_name]] <- c()
+                                 }
+                                 mod_by_var[[var_name]] <- c(mod_by_var[[var_name]], mod)
+                               }
+                               
+                               for (var in names(mod_by_var)) {
+                                 cat(sprintf("  %s: %s\n", var, paste(mod_by_var[[var]], collapse = ", ")))
+                               }
+                             }
+                             
+                             invisible(self)
+                           }
+                         )
 )
 
 
+# =============================================================================
+# USAGE EXAMPLE
+# =============================================================================
+
+cat("\n")
+cat("==================================================\n")
+cat("MCA + HIERARCHICAL CLUSTERING DEMONSTRATION\n")
+cat("==================================================\n")
+
+# Create training dataset
+set.seed(42)
+n_train <- 300
+
+data_train <- data.frame(
+  education = sample(c("Bac", "Licence", "Master", "Doctorat"), n_train, replace = TRUE),
+  sector = sample(c("Tech", "Finance", "Santé", "Education"), n_train, replace = TRUE),
+  experience = sample(c("Junior", "Confirmé", "Senior"), n_train, replace = TRUE),
+  city = sample(c("Paris", "Lyon", "Marseille", "Toulouse"), n_train, replace = TRUE)
+)
+
+cat(sprintf("\nTraining data: %d individuals\n", nrow(data_train)))
+
+# Initialize and train the model
+acm <- ACMClustering$new(n_components = 5)
+acm$fit(data_train)
+
+# Display results with print()
+print(acm)
+
+# Perform hierarchical clustering
+acm$elbow_method(max_clusters = 8, method = "ward")
+labels_hierarchical <- acm$clustering_hierarchical(n_clusters = 4, method = "ward")
+
+# Display results again after clustering
+cat("\n\n=== AFTER CLUSTERING ===\n")
+print(acm)
+
+acm$plot_modalities(axes = c(1, 2), labels = labels_hierarchical, show_variables = FALSE)
+
+# Create new data for prediction
+set.seed(123)
+n_test <- 50
+
+data_test <- data.frame(
+  education = sample(c("Bac", "Licence", "Master", "Doctorat"), n_test, replace = TRUE),
+  sector = sample(c("Tech", "Finance", "Santé", "Education"), n_test, replace = TRUE),
+  experience = sample(c("Junior", "Confirmé", "Senior"), n_test, replace = TRUE),
+  city = sample(c("Paris", "Lyon", "Marseille", "Toulouse"), n_test, replace = TRUE)
+)
+
+cat(sprintf("\nTest data: %d individuals\n", nrow(data_test)))
+cat("\nFirst rows of test data:\n")
+print(head(data_test))
+
+# PREDICT clusters for new data
+predictions <- acm$predict(data_test)
+
+# Display detailed results
+cat("\n\nDetailed prediction results:\n")
+print(head(predictions$predictions, 15))
+
+cat("\n")
+cat("==================================================\n")
+cat("ANALYSIS COMPLETED\n")
+cat("==================================================\n")
