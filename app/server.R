@@ -5,7 +5,7 @@ library(shinyjs)
 library(ClusterVariable)
 
 server <- function(input, output, session) {
-   #fichier lourd
+  #fichier lourd
   options(shiny.maxRequestSize = 1000 * 1024^2)
 
   disable("coude")
@@ -182,6 +182,7 @@ server <- function(input, output, session) {
 
       enable("coude")
       enable("Importer")
+      enable("interpreter")
 
       output$Résumé <- renderPrint(model$summary())
     }
@@ -221,10 +222,9 @@ server <- function(input, output, session) {
   # 5. INTERPRÉTATION (X)
   # ===============================
 
+  # Bouton pour naviguer vers les résultats
   observeEvent(input$interpreter, {
     req(cleaned_data())
-
-    updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
 
     model <- model_reactif()
     if (is.null(model)) {
@@ -232,47 +232,69 @@ server <- function(input, output, session) {
       return()
     }
 
-    # === KMEANS ===
+    # Changement d'onglet
+    updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
+  })
+
+  # === OUTPUTS RÉACTIFS (toujours actifs) ===
+
+  # Qualité du clustering
+  output$qualite <- renderPrint({
+    req(model_reactif())
+    model <- model_reactif()
+
     if (input$method == "kmeans") {
-
-      output$qualite <- renderPrint({
-          model$cluster_quality_report()
-      })
-
-      #plot
-      output$pca_plot <- renderPlot({
-        model$plot_clusters()
-      })
-
-      #heatmap
-      output$heatmap <- renderPlot({
-        model$plot_heatmap()
-      })
-
-
-    }
-
-    # === CAH ===
-    if (input$method == "CAH") {
-      output$qualite <- renderPrint({
-        model$summary()
-      })
-    }
-
-    if (input$method == "ACM"){
+      model$cluster_quality_report()
+    } else if (input$method == "CAH") {
+      model$summary()
+    } else if (input$method == "ACM") {
       #Partie de Marvin
+      cat("Résultats ACM à venir...")
     }
   })
 
+  # === VISUALISATIONS DU CLUSTERING ===
 
-  # ==================================================
-  # 6. IMPORTATION DES VARIABLES EXPLICATIVES
-  # ==================================================
+  # Plot PCA (Kmeans)
+  output$pca_plot <- renderPlot({
+    req(model_reactif())
+    req(input$method == "kmeans")
 
-  observeEvent(input$Importer, {
-    updateNavbarPage(session, "onglets", selected = "Importation_explanatory variable")
+    model <- model_reactif()
+    model$plot_clusters()
   })
 
+  # Heatmap (Kmeans)
+  output$heatmap <- renderPlot({
+    req(model_reactif())
+    req(input$method == "kmeans")
+
+    model <- model_reactif()
+    model$plot_heatmap()
+  })
+
+  # Visualisations CAH (Miléna)
+
+  #{{================du code ici ==============}}
+
+  # Visualisations ACM (Marvin)
+
+  #{{================du code ici ==============}}
+
+
+
+
+
+
+
+
+
+  # ==================================================
+  # 6. IMPORTATION DES VARIABLES EXPLICATIVES (MODAL)
+  # ==================================================
+
+  # NOUVEAU: Le bouton Importer n'ouvre plus un nouvel onglet, mais le modal
+  # Pas besoin de observeEvent pour changer d'onglet
 
   data_exp <- reactive({
     req(input$fichier_exp)
@@ -297,14 +319,21 @@ server <- function(input, output, session) {
   output$tableau_import_exp <- renderDT({
     req(data_exp())
     datatable(head(data_exp(), 10),
-              options = list(pageLength = 10, scrollX = TRUE),
+              options = list(pageLength = 5, scrollX = TRUE),
               rownames = FALSE)
+  })
+
+  # NOUVEAU: Version UI pour le modal
+  output$tableau_import_exp_ui <- renderUI({
+    if (is.null(data_exp())) {
+      return(p("Aucune donnée importée", style = "color: #7f8c8d; font-style: italic;"))
+    }
+    DTOutput("tableau_import_exp")
   })
 
   observeEvent(input$valider_exp, {
     req(data_exp())
     showNotification("Variables explicatives importées.", type = "message")
-    updateNavbarPage(session, "onglets", selected = "Cleaning_explanatory variable")
   })
 
 
@@ -331,32 +360,28 @@ server <- function(input, output, session) {
       }
     }
 
-    if (input$supprimer_outliers_exp) {
-      for (col in names(df)) {
-        if (is.numeric(df[[col]])) {
 
-          Q1 <- quantile(df[[col]], 0.25, na.rm = TRUE)
-          Q3 <- quantile(df[[col]], 0.75, na.rm = TRUE)
-          IQR <- Q3 - Q1
-
-          low_bound  <- Q1 - 1.5 * IQR
-          high_bound <- Q3 + 1.5 * IQR
-
-          df[[col]][df[[col]] < low_bound | df[[col]] > high_bound] <- NA
-        }
-      }
-    }
 
     cleaned_data_exp(df)
+    showNotification("Nettoyage effectué avec succès !", type = "message")
   })
 
   output$tableau_importe_nettoye_exp <- renderDT({
     req(cleaned_data_exp())
-    datatable(head(cleaned_data_exp(), 10),
-              options = list(pageLength = 10, scrollX = TRUE),
+    datatable(head(cleaned_data_exp(), 5),
+              options = list(pageLength = 5, scrollX = TRUE),
               rownames = FALSE
     )
   })
+
+  # NOUVEAU: Version UI pour le modal
+  output$tableau_importe_nettoye_exp_ui <- renderUI({
+    if (is.null(cleaned_data_exp())) {
+      return(p("Aucune donnée nettoyée", style = "color: #7f8c8d; font-style: italic;"))
+    }
+    DTOutput("tableau_importe_nettoye_exp")
+  })
+
   # ==== Statistiques descriptives ====
   output$statistiques_exp <- renderUI({
     req(cleaned_data())
@@ -380,13 +405,195 @@ server <- function(input, output, session) {
     )
   })
 
+  # NOUVEAU: Indicateur si des variables exp sont chargées
+  output$has_exp_data <- reactive({
+    !is.null(cleaned_data_exp())
+  })
+  outputOptions(output, "has_exp_data", suspendWhenHidden = FALSE)
+
+  # NOUVEAU: Badge d'information
+  output$badge_variables_exp <- renderUI({
+    if (!is.null(cleaned_data_exp())) {
+      div(
+        style = "margin-bottom: 15px;",
+        tags$span(
+          class = "badge-info",
+          icon("check-circle"),
+          paste0(ncol(cleaned_data_exp()), " variables illustratives chargées")
+        )
+      )
+    }
+  })
 
 
   # 8. PRÉDICTION AVEC VARIABLES EXPLICATIVES
-  observeEvent(input$Prediction, {
-    req(cleaned_data(), cleaned_data_exp())
+  # Maintenant géré dans observeEvent(input$Prediction_modal) ci-dessus
 
-    updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
+  # NOUVEAU: Observer pour ouvrir le modal depuis les boutons
+  observeEvent(input$Importer, {
+    showModal(modalDialog(
+      title = tagList(icon("plus-square"), " Importer des variables illustratives"),
+      size = "l",
+      easyClose = TRUE,
+      footer = tagList(
+        modalButton("Fermer"),
+        actionButton("Prediction_modal", "Lancer la prédiction",
+                     icon = icon("rocket"),
+                     class = "btn-success")
+      ),
+
+      # Étape 1: Importation
+      div(
+        h5(style = "color: #3498db; font-weight: 600; margin-bottom: 20px;",
+           icon("upload"), " Étape 1 : Sélectionner le fichier"),
+        fileInput(
+          "fichier_exp",
+          label = tagList(icon("file-excel"), "Fichier (CSV ou Excel)"),
+          accept = c(".csv", ".xlsx", ".xls"),
+          buttonLabel = "Parcourir...",
+          placeholder = "Aucun fichier sélectionné"
+        ),
+        helpText("📊 Taille maximale : 1GB",
+                 style = "color: #7f8c8d; font-size: 0.9em;"),
+        selectInput(
+          "separateur_exp",
+          label = tagList(icon("separator"), "Séparateur"),
+          choices = c(Virgule = ",",
+                      `Point-virgule` = ";",
+                      Tabulation = "\t")
+        ),
+        actionButton("valider_exp",
+                     "Valider l'importation",
+                     icon = icon("check-circle"),
+                     class = "btn-success")
+      ),
+
+      hr(),
+
+      # Aperçu des données
+      div(
+        h5(style = "color: #3498db; font-weight: 600; margin-bottom: 20px;",
+           icon("eye"), " Aperçu des données"),
+        DTOutput("tableau_import_exp")
+      ),
+
+      hr(),
+
+      # Étape 2: Nettoyage
+      div(
+        h5(style = "color: #3498db; font-weight: 600; margin-bottom: 20px;",
+           icon("broom"), " Étape 2 : Options de nettoyage"),
+        div(style = "background: #f8f9fa; padding: 15px; border-radius: 8px;",
+            checkboxInput(
+              "supprimer_na_exp",
+              HTML("<strong>Imputation intelligente</strong><br>
+                   <small style='color: #7f8c8d;'>Numériques → moyenne |
+                   Catégorielles → « manquant »</small>"),
+              value = FALSE
+            )
+        ),
+        br(),
+        actionButton("nettoyer_exp",
+                     "Appliquer le nettoyage",
+                     icon = icon("magic"),
+                     class = "btn-primary")
+      ),
+
+      hr(),
+
+      # Aperçu nettoyé
+      div(
+        h5(style = "color: #3498db; font-weight: 600; margin-bottom: 20px;",
+           icon("table"), " Données nettoyées"),
+        DTOutput("tableau_importe_nettoye_exp")
+      )
+    ))
+  })
+
+  observeEvent(input$open_modal_from_results, {
+    showModal(modalDialog(
+      title = tagList(icon("plus-square"), " Importer des variables illustratives"),
+      size = "l",
+      easyClose = TRUE,
+      footer = tagList(
+        modalButton("Fermer"),
+        actionButton("Prediction_modal", "Lancer la prédiction",
+                     icon = icon("rocket"),
+                     class = "btn-success")
+      ),
+
+      # Étape 1: Importation
+      div(
+        h5(style = "color: #3498db; font-weight: 600; margin-bottom: 20px;",
+           icon("upload"), " Étape 1 : Sélectionner le fichier"),
+        fileInput(
+          "fichier_exp",
+          label = tagList(icon("file-excel"), "Fichier (CSV ou Excel)"),
+          accept = c(".csv", ".xlsx", ".xls"),
+          buttonLabel = "Parcourir...",
+          placeholder = "Aucun fichier sélectionné"
+        ),
+        helpText("📊 Taille maximale : 1GB",
+                 style = "color: #7f8c8d; font-size: 0.9em;"),
+        selectInput(
+          "separateur_exp",
+          label = tagList(icon("separator"), "Séparateur"),
+          choices = c(Virgule = ",",
+                      `Point-virgule` = ";",
+                      Tabulation = "\t")
+        ),
+        actionButton("valider_exp",
+                     "Valider l'importation",
+                     icon = icon("check-circle"),
+                     class = "btn-success")
+      ),
+
+      hr(),
+
+      # Aperçu des données
+      div(
+        h5(style = "color: #3498db; font-weight: 600; margin-bottom: 20px;",
+           icon("eye"), " Aperçu des données"),
+        DTOutput("tableau_import_exp")
+      ),
+
+      hr(),
+
+      # Étape 2: Nettoyage
+      div(
+        h5(style = "color: #3498db; font-weight: 600; margin-bottom: 20px;",
+           icon("broom"), " Étape 2 : Options de nettoyage"),
+        div(style = "background: #f8f9fa; padding: 15px; border-radius: 8px;",
+            checkboxInput(
+              "supprimer_na_exp",
+              HTML("<strong>Imputation intelligente</strong><br>
+                   <small style='color: #7f8c8d;'>Numériques → moyenne |
+                   Catégorielles → « manquant »</small>"),
+              value = FALSE
+            )
+
+        ),
+        br(),
+        actionButton("nettoyer_exp",
+                     "Appliquer le nettoyage",
+                     icon = icon("magic"),
+                     class = "btn-primary")
+      ),
+
+      hr(),
+
+      # Aperçu nettoyé
+      div(
+        h5(style = "color: #3498db; font-weight: 600; margin-bottom: 20px;",
+           icon("table"), " Données nettoyées"),
+        DTOutput("tableau_importe_nettoye_exp")
+      )
+    ))
+  })
+
+  # Gestion du bouton Prediction dans le modal
+  observeEvent(input$Prediction_modal, {
+    req(cleaned_data(), cleaned_data_exp())
 
     model <- model_reactif()
 
@@ -395,14 +602,16 @@ server <- function(input, output, session) {
       return()
     }
 
-    pred <- model$predict(X = cleaned_data_exp())
+    pred <- model$predict(cleaned_data_exp())
 
     output$summary_output <- renderPrint({
       cat("=== Résultats de la prédiction ===\n")
-      model$summary()
+       pred
     })
 
-    showNotification("Prédiction effectuée.", type = "message")
+    showNotification("Prédiction effectuée avec succès !", type = "message")
+    removeModal()
+    updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
   })
 
 }
