@@ -261,46 +261,6 @@ ui <- navbarPage(
         padding: 30px;
       }
 
-      /* MODAL STYLING */
-      .modal-content {
-        border-radius: 15px;
-        border: none;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-      }
-
-      .modal-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 15px 15px 0 0;
-        padding: 20px 25px;
-        border: none;
-      }
-
-      .modal-title {
-        font-weight: 600;
-        font-size: 1.3em;
-      }
-
-      .modal-body {
-        padding: 30px;
-      }
-
-      .modal-footer {
-        border-top: 2px solid #e0e0e0;
-        padding: 20px 25px;
-      }
-
-      .close {
-        color: white;
-        opacity: 1;
-        text-shadow: none;
-        font-size: 1.5em;
-      }
-
-      .close:hover {
-        color: #f0f0f0;
-      }
-
       /* Badge pour indicateur */
       .badge-info {
         background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
@@ -323,6 +283,27 @@ ui <- navbarPage(
       .info-box i {
         color: #3498db;
         margin-right: 10px;
+      }
+
+      /* Variables selection boxes */
+      .variables-box {
+        background: #f8f9fa;
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .variables-box-active {
+        border-color: #2ecc71;
+        background: #f0fff4;
+      }
+
+      .variables-box-illustrative {
+        border-color: #3498db;
+        background: #f0f8ff;
       }
     "))
   ),
@@ -384,6 +365,39 @@ ui <- navbarPage(
         div(class = "card",
             h4(class = "section-title",
                icon("sliders-h"), "Options de nettoyage"),
+
+            # NOUVEAU: Sélection des variables ACTIVES (pour le clustering)
+            div(class = "variables-box variables-box-active",
+                h5(style = "color: #27ae60; font-weight: 600; margin-bottom: 10px;",
+                   icon("check-circle"), " Variables actives"),
+                helpText("Ces variables seront utilisées pour construire le clustering",
+                         style = "color: #555; font-size: 0.85em; margin-bottom: 10px;"),
+                checkboxGroupInput(
+                  "colonnes_actives",
+                  label = NULL,
+                  choices = NULL,
+                  selected = NULL
+                )
+            ),
+
+            hr(),
+
+            # NOUVEAU: Sélection des variables ILLUSTRATIVES (pour la prédiction)
+            div(class = "variables-box variables-box-illustrative",
+                h5(style = "color: #3498db; font-weight: 600; margin-bottom: 10px;",
+                   icon("magic"), " Variables illustratives"),
+                helpText("Ces variables seront utilisées pour la prédiction (optionnel)",
+                         style = "color: #555; font-size: 0.85em; margin-bottom: 10px;"),
+                checkboxGroupInput(
+                  "colonnes_illustratives",
+                  label = NULL,
+                  choices = NULL,
+                  selected = NULL
+                )
+            ),
+
+            hr(),
+
             div(style = "background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;",
                 checkboxInput(
                   "supprimer_na",
@@ -532,165 +546,31 @@ ui <- navbarPage(
                   h4(style = "color: #2c3e50; font-weight: 600;",
                      icon("wand-magic-sparkles"), "Résultats des prédictions"),
 
-                  # Bouton pour ouvrir le modal si pas encore de variables
+                  # Bouton pour lancer la prédiction si variables illustratives sélectionnées
                   conditionalPanel(
                     condition = "output.has_exp_data == false",
                     div(class = "info-box",
                         icon("info-circle"),
-                        strong("Aucune variable illustrative chargée."),
+                        strong("Aucune variable illustrative sélectionnée."),
                         br(),
-                        "Cliquez sur le bouton ci-dessous pour importer des variables illustratives."
-                    ),
-                    br(),
-                    actionButton("open_modal_from_results",
-                                 "Importer des variables illustratives",
-                                 icon = icon("plus-circle"),
-                                 class = "btn-default")
+                        "Retournez à la page 'Nettoyage' pour sélectionner des variables illustratives."
+                    )
                   ),
 
-                  # Affichage des résultats si variables chargées
+                  conditionalPanel(
+                    condition = "output.has_exp_data == true",
+                    actionButton("Importer",
+                                 "Lancer la prédiction",
+                                 icon = icon("rocket"),
+                                 class = "btn-success")
+                  ),
+
+                  # Affichage des résultats si prédiction lancée
+                  hr(),
                   verbatimTextOutput("summary_output")
               )
             )
           )
-      )
-    )
-  ),
-
-  # ===============================================
-  # MODAL POUR VARIABLES ILLUSTRATIVES
-  # ===============================================
-
-  # Script JavaScript pour gérer le modal
-  tags$script(HTML("
-    $(document).ready(function() {
-      // Handlers pour ouvrir/fermer le modal depuis R
-      Shiny.addCustomMessageHandler('openModal', function(modalId) {
-        $('#' + modalId).modal('show');
-      });
-
-      Shiny.addCustomMessageHandler('closeModal', function(modalId) {
-        $('#' + modalId).modal('hide');
-      });
-    });
-  ")),
-
-  tags$div(
-    id = "modal_variables_exp",
-    class = "modal fade",
-    tabindex = "-1",
-    role = "dialog",
-    `data-backdrop` = "true",
-    `data-keyboard` = "true",
-    tags$div(
-      class = "modal-dialog modal-lg",
-      role = "document",
-      tags$div(
-        class = "modal-content",
-
-        # En-tête du modal
-        tags$div(
-          class = "modal-header",
-          tags$button(
-            type = "button",
-            class = "close",
-            `data-dismiss` = "modal",
-            `aria-label` = "Close",
-            tags$span(`aria-hidden` = "true", "×")
-          ),
-          tags$h4(
-            class = "modal-title",
-            icon("plus-square"),
-            " Importer des variables illustratives"
-          )
-        ),
-
-        # Corps du modal
-        tags$div(
-          class = "modal-body",
-
-          # Étape 1: Importation
-          div(
-            h5(style = "color: #3498db; font-weight: 600; margin-bottom: 20px;",
-               icon("upload"), " Étape 1 : Sélectionner le fichier"),
-            fileInput(
-              "fichier_exp",
-              label = tagList(icon("file-excel"), "Fichier (CSV ou Excel)"),
-              accept = c(".csv", ".xlsx", ".xls"),
-              buttonLabel = "Parcourir...",
-              placeholder = "Aucun fichier sélectionné"
-            ),
-            helpText("📊 Taille maximale : 1GB",
-                     style = "color: #7f8c8d; font-size: 0.9em;"),
-            selectInput(
-              "separateur_exp",
-              label = tagList(icon("separator"), "Séparateur"),
-              choices = c(Virgule = ",",
-                          `Point-virgule` = ";",
-                          Tabulation = "\t")
-            ),
-            actionButton("valider_exp",
-                         "Valider l'importation",
-                         icon = icon("check-circle"),
-                         class = "btn-success")
-          ),
-
-          hr(),
-
-          # Aperçu des données
-          div(
-            h5(style = "color: #3498db; font-weight: 600; margin-bottom: 20px;",
-               icon("eye"), " Aperçu des données"),
-            DTOutput("tableau_import_exp")
-          ),
-
-          hr(),
-
-          # Étape 2: Nettoyage
-          div(
-            h5(style = "color: #3498db; font-weight: 600; margin-bottom: 20px;",
-               icon("broom"), " Étape 2 : Options de nettoyage"),
-            div(style = "background: #f8f9fa; padding: 15px; border-radius: 8px;",
-                checkboxInput(
-                  "supprimer_na_exp",
-                  HTML("<strong>Imputation intelligente</strong><br>
-                       <small style='color: #7f8c8d;'>Numériques → moyenne |
-                       Catégorielles → « manquant »</small>"),
-                  value = FALSE
-                )
-            ),
-            br(),
-            actionButton("nettoyer_exp",
-                         "Appliquer le nettoyage",
-                         icon = icon("magic"),
-                         class = "btn-primary")
-          ),
-
-          hr(),
-
-          # Aperçu nettoyé
-          div(
-            h5(style = "color: #3498db; font-weight: 600; margin-bottom: 20px;",
-               icon("table"), " Données nettoyées"),
-            DTOutput("tableau_importe_nettoye_exp")
-          )
-        ),
-
-        # Pied du modal
-        tags$div(
-          class = "modal-footer",
-          tags$button(
-            type = "button",
-            class = "btn btn-default",
-            `data-dismiss` = "modal",
-            icon("times"),
-            " Fermer"
-          ),
-          actionButton("Prediction",
-                       "Lancer la prédiction",
-                       icon = icon("rocket"),
-                       class = "btn-success")
-        )
       )
     )
   )
