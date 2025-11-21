@@ -401,10 +401,6 @@ abline(v = which.min(d2), col = "red", lty = 2)
 
 }
 \references{
-Ward, J. H. (1963). Hierarchical Grouping to Optimize an Objective Function.
-\emph{Journal of the American Statistical Association}, 58(301), 236-244.
-\doi{10.1080/01621459.1963.10500845}
-
 Rakotomalala, R. (2020). \emph{Classification ascendante hiérarchique}.
 Université Lyon 2.
 \url{https://eric.univ-lyon2.fr/ricco/cours/cours_classification_hierarchique.html}

@@ -12,13 +12,10 @@ server <- function(input, output, session) {
   disable("interpreter")
   disable("Importer")
 
-
-  # MÉMOIRE DU MODÈLE ENTRAÎNÉ (Pour ce souvenir des calculs de cluster)
-
+  # MÉMOIRE DU MODÈLE ENTRAÎNÉ
   model_reactif <- reactiveVal(NULL)
 
   # 1. IMPORTATION DES DONNÉES X
-
   data <- reactive({
     req(input$fichier)
     ext <- tools::file_ext(input$fichier$name)
@@ -39,21 +36,47 @@ server <- function(input, output, session) {
     return(df)
   })
 
-  # NOUVEAU: Mise à jour des choix de colonnes après importation
+  # Mise à jour des choix de colonnes après importation
   observe({
     req(data())
     toutes_colonnes <- names(data())
 
-    # Mettre à jour les variables actives (toutes sélectionnées par défaut)
     updateCheckboxGroupInput(session, "colonnes_actives",
                              choices = toutes_colonnes,
                              selected = toutes_colonnes)
 
-    # Mettre à jour les variables illustratives (aucune par défaut)
     updateCheckboxGroupInput(session, "colonnes_illustratives",
                              choices = toutes_colonnes,
                              selected = NULL)
   })
+
+  # SYNCHRONISATION SIMPLE - Quand ACTIVES changent
+  observeEvent(input$colonnes_actives, {
+    colonnes_illus_actuelles <- input$colonnes_illustratives
+    colonnes_actives_nouvelles <- input$colonnes_actives
+
+    # Retirer des illustratives les colonnes qui sont en actives
+    colonnes_illus_mises_a_jour <- setdiff(colonnes_illus_actuelles, colonnes_actives_nouvelles)
+
+    if (!identical(colonnes_illus_mises_a_jour, colonnes_illus_actuelles)) {
+      updateCheckboxGroupInput(session, "colonnes_illustratives",
+                               selected = colonnes_illus_mises_a_jour)
+    }
+  }, ignoreNULL = FALSE)
+
+  # SYNCHRONISATION SIMPLE - Quand ILLUSTRATIVES changent
+  observeEvent(input$colonnes_illustratives, {
+    colonnes_actives_actuelles <- input$colonnes_actives
+    colonnes_illus_nouvelles <- input$colonnes_illustratives
+
+    # Retirer des actives les colonnes qui sont en illustratives
+    colonnes_actives_mises_a_jour <- setdiff(colonnes_actives_actuelles, colonnes_illus_nouvelles)
+
+    if (!identical(colonnes_actives_mises_a_jour, colonnes_actives_actuelles)) {
+      updateCheckboxGroupInput(session, "colonnes_actives",
+                               selected = colonnes_actives_mises_a_jour)
+    }
+  }, ignoreNULL = FALSE)
 
   # --- Bouton valider ---
   observeEvent(input$valider, {
@@ -71,9 +94,7 @@ server <- function(input, output, session) {
       rownames = FALSE)
   })
 
-
   # 2. NETTOYAGE DES DONNÉES X
-
   cleaned_data <- reactiveVal(NULL)
   cleaned_data_illustratives <- reactiveVal(NULL)
 
@@ -129,7 +150,6 @@ server <- function(input, output, session) {
     }
   })
 
-
   # === Affichage du tableau nettoyé =====
   output$tableau_importe_nettoye_x <- renderDT({
     req(cleaned_data())
@@ -147,14 +167,11 @@ server <- function(input, output, session) {
 
     tagList(
       DT::datatable(summary(df)),
-
       hr(),
-
       h4("Dimensions"),
-      HTML(paste("Nombre de lignes :", nrow(df), "<br>,
-		Nombre de colonnes :", ncol(df))),
+      HTML(paste("Nombre de lignes :", nrow(df), "<br>",
+                 "Nombre de colonnes :", ncol(df))),
       hr(),
-
       h4("Types des colonnes"),
       DT::datatable(
         data.frame(Colonne = names(df), Type = sapply(df, class)),
@@ -169,8 +186,6 @@ server <- function(input, output, session) {
   })
 
   #========  passer au clustering ===============
-  #===apercu des donne netoyes dans la page clustering===
-  # tableOutput("tableau_cluster"),
   output$tableau_cluster <- renderDT({
     req(cleaned_data())
     datatable(
@@ -179,7 +194,6 @@ server <- function(input, output, session) {
       rownames = FALSE
     )
   })
-
 
   # ===============================
   # 3. LANCER LE CLUSTERING (X)
@@ -200,7 +214,7 @@ server <- function(input, output, session) {
     }
     if (input$method == "CAH" &&
         !all(sapply(cleaned_data(), is.numeric))) {
-      showNotification("Notre CAH traite que les variables numeriques! pour les variables qualitatives essayer la      methode ACM.", type = "warning")
+      showNotification("Notre CAH traite que les variables numeriques! pour les variables qualitatives essayer la methode ACM.", type = "warning")
       return()
     }
 
@@ -209,7 +223,7 @@ server <- function(input, output, session) {
       model <- clusterVariable$new(k = input$k)
       model$fit(cleaned_data())
 
-      model_reactif(model)     # On sauvegarde le modèle
+      model_reactif(model)
 
       enable("coude")
       enable("Importer")
@@ -228,7 +242,7 @@ server <- function(input, output, session) {
       model$fit(cleaned_data())
       model$cutree(k = k_val)
 
-      model_reactif(model)     # On sauvegarde le modele
+      model_reactif(model)
 
       enable("coude")
       enable("Importer")
@@ -241,7 +255,6 @@ server <- function(input, output, session) {
       #Partie de Marvin
     }
   })
-
 
   # ===============================
   # 4. MÉTHODE DU COUDE
@@ -260,19 +273,16 @@ server <- function(input, output, session) {
     }
     if (input$method == "CAH"){
       #Miléna
-
     }
     if (input$method == "ACM"){
       #Partie de Marvin
     }
   })
 
-
   # ===============================
   # 5. INTERPRÉTATION (X)
   # ===============================
 
-  # Bouton pour naviguer vers les résultats
   observeEvent(input$interpreter, {
     req(cleaned_data())
 
@@ -282,13 +292,11 @@ server <- function(input, output, session) {
       return()
     }
 
-    # Changement d'onglet
     updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
   })
 
-  # === OUTPUTS RÉACTIFS (toujours actifs) ===
+  # === OUTPUTS RÉACTIFS ===
 
-  # Qualité du clustering
   output$qualite <- renderPrint({
     req(model_reactif())
     model <- model_reactif()
@@ -298,14 +306,11 @@ server <- function(input, output, session) {
     } else if (input$method == "CAH") {
       model$summary()
     } else if (input$method == "ACM") {
-      #Partie de Marvin
       cat("Résultats ACM à venir...")
     }
   })
 
-  # === VISUALISATIONS DU CLUSTERING ===
-
-  # Plot PCA (Kmeans)
+  # Plot PCA
   output$pca_plot <- renderPlot({
     req(model_reactif())
     req(input$method == "kmeans")
@@ -314,7 +319,7 @@ server <- function(input, output, session) {
     model$plot_clusters()
   })
 
-  # Heatmap (Kmeans)
+  # Heatmap
   output$heatmap <- renderPlot({
     req(model_reactif())
     req(input$method == "kmeans")
@@ -323,26 +328,15 @@ server <- function(input, output, session) {
     model$plot_heatmap()
   })
 
-  # Visualisations CAH (Miléna)
-
-  #{{================du code ici ==============}}
-
-  # Visualisations ACM (Marvin)
-
-  #{{================du code ici ==============}}
-
-
   # ==================================================
   # 6. PRÉDICTION AVEC VARIABLES ILLUSTRATIVES
   # ==================================================
 
-  # NOUVEAU: Indicateur si des variables illustratives sont sélectionnées
   output$has_exp_data <- reactive({
     !is.null(cleaned_data_illustratives())
   })
   outputOptions(output, "has_exp_data", suspendWhenHidden = FALSE)
 
-  # NOUVEAU: Badge d'information
   output$badge_variables_exp <- renderUI({
     if (!is.null(cleaned_data_illustratives())) {
       div(
@@ -356,7 +350,6 @@ server <- function(input, output, session) {
     }
   })
 
-  # Gestion du bouton Prediction (directement depuis la page Résultats)
   observeEvent(input$Importer, {
     req(cleaned_data(), cleaned_data_illustratives())
 
@@ -371,11 +364,10 @@ server <- function(input, output, session) {
 
     output$summary_output <- renderPrint({
       cat("=== Résultats de la prédiction ===\n")
-      pred
+      pred <- model$summary()
     })
 
     showNotification("Prédiction effectuée avec succès !", type = "message")
     updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
   })
-
 }

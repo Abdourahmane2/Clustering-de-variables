@@ -329,7 +329,7 @@ ui <- navbarPage(
             helpText("📊 Taille maximale : 1GB", style = "color: #7f8c8d; font-size: 0.9em;"),
             selectInput(
               "separateur",
-              label = tagList(icon("separator"), "Séparateur"),
+              label = tagList(icon("grip-lines"), "Séparateur"),
               choices = c(Virgule = ",",
                           `Point-virgule` = ";",
                           Tabulation = "\t")

@@ -1,23 +1,34 @@
 Package: ClusterVariable
 Type: Package
-Title: clustering de variables
+Title: Clustering de Variables
 Version: 0.1.0
-Author: Abdourahmane  , Marvin , Milena 
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: ce package permet de faire le clustering de variables 
-License: What license is it under?
+Authors@R: c(
+    person("Abdourahmane", role = "aut"),
+    person("Marvin", role = "aut"),
+    person("Milena", role = c("aut", "cre"), email = "milena@example.com"))
+Description: Package permettant de réaliser du clustering de variables 
+    à l'aide de méthodes hiérarchiques (CAH) ou non-hierarchiques (k-means).
+License: MIT + file LICENSE
 Encoding: UTF-8
-LazyData: true  
+LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-Collate: 
-    'CAH.R'
-    'mon_kmeans.R'
-    'clusterVariable.R'
-Suggests: 
+Imports:
+    R6,
+    stats,
+    utils,
+    graphics,
+    FactoMineR,
+    factoextra,
+    proxy,
+    pheatmap,
+    klaR
+Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
-Imports: 
-    R6
+Collate: 
+    CAH.R
+    mon_kmeans.R
+    clusterVariable.R
 Depends: 
     R (>= 4.0.0)
