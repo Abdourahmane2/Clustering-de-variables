@@ -606,7 +606,7 @@ server <- function(input, output, session) {
 
     output$summary_output <- renderPrint({
       cat("=== Résultats de la prédiction ===\n")
-       pred
+      pred
     })
 
     showNotification("Prédiction effectuée avec succès !", type = "message")
