@@ -9,8 +9,8 @@ Variable Clustering using K-means Algorithm
 Variable Clustering using K-means Algorithm
 }
 \details{
-The `clusterVariable` R6 class performs clustering on variables (columns) of a dataset
-using a custom implementation of the K-means algorithm (`mon_kmeans`).
+The \code{clusterVariable} R6 class performs clustering on variables (columns) of a dataset
+using a custom implementation of the K-means algorithm (\code{mon_kmeans}).
 It supports automatic data cleaning, visualization, prediction for new data,
 and quality evaluation via silhouette scores.
 }
@@ -54,7 +54,7 @@ cv$plot_silhouette()
 \if{html}{\out{<a id="method-clusterVariable-new"></a>}}
 \if{latex}{\out{\hypertarget{method-clusterVariable-new}{}}}
 \subsection{Method \code{new()}}{
-Create a new `clusterVariable` object.
+Create a new \code{clusterVariable} object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{clusterVariable$new(k = 3, max_iter = 100, auto_clean = TRUE)}\if{html}{\out{</div>}}
 }
@@ -71,7 +71,7 @@ Create a new `clusterVariable` object.
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-A new `clusterVariable` object.
+A new \code{clusterVariable} object.
 }
 }
 \if{html}{\out{<hr>}}
@@ -134,7 +134,7 @@ Prints comprehensive information about the clustering.
 \if{html}{\out{<a id="method-clusterVariable-print"></a>}}
 \if{latex}{\out{\hypertarget{method-clusterVariable-print}{}}}
 \subsection{Method \code{print()}}{
-Print a concise textual summary of the object.
+Print a concise summary of the clusterVariable object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{clusterVariable$print()}\if{html}{\out{</div>}}
 }
@@ -222,7 +222,7 @@ Generate a comprehensive report of clustering quality.
 }
 
 \subsection{Returns}{
-A list with detailed statistics.
+Prints detailed statistics about clustering quality.
 Apply data cleaning pipeline
 Handle missing values
 Handle outliers using IQR method
