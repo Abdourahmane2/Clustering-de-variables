@@ -52,31 +52,28 @@ server <- function(input, output, session) {
 
   # SYNCHRONISATION SIMPLE - Quand ACTIVES changent
   observeEvent(input$colonnes_actives, {
-    colonnes_illus_actuelles <- input$colonnes_illustratives
-    colonnes_actives_nouvelles <- input$colonnes_actives
+    illus_current <- input$colonnes_illustratives
+    actives_current <- input$colonnes_actives
 
-    # Retirer des illustratives les colonnes qui sont en actives
-    colonnes_illus_mises_a_jour <- setdiff(colonnes_illus_actuelles, colonnes_actives_nouvelles)
+    new_illus <- setdiff(illus_current, actives_current)
 
-    if (!identical(colonnes_illus_mises_a_jour, colonnes_illus_actuelles)) {
-      updateCheckboxGroupInput(session, "colonnes_illustratives",
-                               selected = colonnes_illus_mises_a_jour)
-    }
-  }, ignoreNULL = FALSE)
+   if (!identical(new_illus, illus_current)){
+     updateCheckboxGroupInput(session, "colonnes_illustratives", selected = new_illus)
+   }
+  })
 
   # SYNCHRONISATION SIMPLE - Quand ILLUSTRATIVES changent
   observeEvent(input$colonnes_illustratives, {
-    colonnes_actives_actuelles <- input$colonnes_actives
-    colonnes_illus_nouvelles <- input$colonnes_illustratives
+    actives_current <- input$colonnes_actives
+    illus_current <- input$colonnes_illustratives
 
     # Retirer des actives les colonnes qui sont en illustratives
-    colonnes_actives_mises_a_jour <- setdiff(colonnes_actives_actuelles, colonnes_illus_nouvelles)
+    new_actives <- setdiff(actives_current, illus_current)
 
-    if (!identical(colonnes_actives_mises_a_jour, colonnes_actives_actuelles)) {
-      updateCheckboxGroupInput(session, "colonnes_actives",
-                               selected = colonnes_actives_mises_a_jour)
+    if (!identical(new_actives, actives_current)) {
+      updateCheckboxGroupInput(session, "colonnes_actives", selected = new_actives)
     }
-  }, ignoreNULL = FALSE)
+  })
 
   # --- Bouton valider ---
   observeEvent(input$valider, {
@@ -248,7 +245,7 @@ server <- function(input, output, session) {
       enable("Importer")
       enable("interpreter")
 
-      output$Résumé <- renderPrint(model$summary())
+      output$Résumé <- renderPrint(model$print())
     }
 
     if(input$method == "ACM") {
@@ -272,8 +269,18 @@ server <- function(input, output, session) {
       })
     }
     if (input$method == "CAH"){
-      #Miléna
+      k_val <- suppressWarnings(as.numeric(input$k))
+      if (is.na(k_val) || k_val <= 1) k_val <- NULL
+
+      model <- CAH$new("ward.D2")
+      model$fit(cleaned_data())
+      model$cutree(k = k_val)
+
+      output$afficher_coude <- renderPlot({
+        model$plot("elbow")
+      })
     }
+
     if (input$method == "ACM"){
       #Partie de Marvin
     }
@@ -310,7 +317,7 @@ server <- function(input, output, session) {
     }
   })
 
-  # Plot PCA
+  # Plot PCA pour Kmeans
   output$pca_plot <- renderPlot({
     req(model_reactif())
     req(input$method == "kmeans")
@@ -318,6 +325,39 @@ server <- function(input, output, session) {
     model <- model_reactif()
     model$plot_clusters()
   })
+
+  # Plot PCA pour CAH
+  output$pca_plot_cah <- renderPlot({
+    req(model_reactif())
+    req(input$method == "CAH")
+    model <- model_reactif()
+    model$plot("acp")
+  })
+
+  #Plot Dendrogram pour CAH
+  output$dendrogramme_cah <- renderPlot({
+    req(model_reactif())
+    req(input$method == "CAH")
+    model <- model_reactif()
+    model$plot("dendrogramme")
+  })
+
+  # Plot Silhouette pour CAH
+  output$silhouette_cah <- renderPlot({
+    req(model_reactif())
+    req(input$method == "CAH")
+    model <- model_reactif()
+    model$plot("silhouette")
+  })
+
+  # Plot MDS pour CAH
+  output$mds_cah <- renderPlot({
+    req(model_reactif())
+    req(input$method == "CAH")
+    model <- model_reactif()
+    model$plot("mds")
+  })
+
 
   # Heatmap
   output$heatmap <- renderPlot({

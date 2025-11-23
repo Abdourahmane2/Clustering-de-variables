@@ -451,6 +451,8 @@ Husson, F., Lê, S., & Pagès, J. (2017). \emph{Exploratory Multivariate Analysi
 \item{\code{dist_matrix}}{Distance matrix (dissimularity)}
 
 \item{\code{compo_latent}}{List of latent components per cluster}
+
+\item{\code{k_current}}{Integer, current k used for cutree}
 }
 \if{html}{\out{</div>}}
 }
@@ -461,6 +463,7 @@ Husson, F., Lê, S., & Pagès, J. (2017). \emph{Exploratory Multivariate Analysi
 \item \href{#method-CAH-fit}{\code{CAH$fit()}}
 \item \href{#method-CAH-cutree}{\code{CAH$cutree()}}
 \item \href{#method-CAH-predict}{\code{CAH$predict()}}
+\item \href{#method-CAH-plot}{\code{CAH$plot()}}
 \item \href{#method-CAH-print}{\code{CAH$print()}}
 \item \href{#method-CAH-summary}{\code{CAH$summary()}}
 \item \href{#method-CAH-clone}{\code{CAH$clone()}}
@@ -542,6 +545,23 @@ Predict cluster assignments for new variables
 }
 }
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-CAH-plot"></a>}}
+\if{latex}{\out{\hypertarget{method-CAH-plot}{}}}
+\subsection{Method \code{plot()}}{
+Plot various visualizations of the CAH model
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{CAH$plot(type = "dendrogramme")}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{type}}{Character string specifying plot type}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-CAH-print"></a>}}
 \if{latex}{\out{\hypertarget{method-CAH-print}{}}}
 \subsection{Method \code{print()}}{
@@ -553,7 +573,7 @@ Print a summary of the CAH object
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{Additional}}{arguments (ignored)}
+\item{\code{...}}{Additional arguments (ignored)}
 }
 \if{html}{\out{</div>}}
 }
