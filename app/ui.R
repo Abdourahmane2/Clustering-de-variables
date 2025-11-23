@@ -527,6 +527,9 @@ ui <- navbarPage(
             tabPanel(
               tagList(icon("chart-area"), "Visualisations"),
               br(),
+
+              conditionalPanel(
+              condition = "input.method == 'kmeans'",
               div(class = "card",
                   plotOutput("pca_plot", height = "500px") ,
                   # plotOutput("visualisation_cah", height = "500px") ,
@@ -536,6 +539,27 @@ ui <- navbarPage(
               div(class = "card",
                   plotOutput("heatmap", height = "500px")
               )
+            ),
+
+            #CAH
+            conditionalPanel(
+              condition = "input.method == 'CAH'",
+              div(class = "card",
+                  plotOutput("dendrogramme_cah", height = "500px")
+              ),
+              br(),
+              div(class = "card",
+                  plotOutput("pca_plot_cah", height = "500px")
+              ),
+              br(),
+              div(class = "card",
+                  plotOutput("mds_cah", height = "500px")
+              ),
+              br(),
+              div(class = "card",
+                  plotOutput("silhouette_cah", height = "500px")
+              )
+            )
             ),
 
             # NOUVEAU: Onglet pour les prédictions avec variables illustratives

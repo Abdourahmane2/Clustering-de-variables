@@ -461,6 +461,9 @@ CAH <- R6Class(
     #' @field compo_latent List of latent components per cluster
     compo_latent = NULL, # Latent components per cluster
 
+    #' @field k_current Integer, current k used for cutree
+    k_current = NULL,
+
 
     # ===== CONSTRUCTOR =====
 #' @description
@@ -526,9 +529,9 @@ fit = function(data) {
   if (nrow(df) < 2){
     stop("[CAH] There are not enough individuals available for analysis (need at least 2).")
   }
+
   self$data <- df
   message("[CAH] The data is loaded ! There are :", nrow(self$data)," individuals and ", ncol(self$data), " variables.")
-
 
   # Correlation matrix (on raw data - correlation is scale-invariant)
   corr_matrix <- cor(self$data)
@@ -548,9 +551,16 @@ fit = function(data) {
   d1 <- diff(h)
   d2 <- diff(d1)
 
+  if (length(d2) >= 2){
+    idx_in_d2 <- which.min(d2[2:length(d2)])
+    idx_elbow <- idx_in_d2 + 1
+    self$best_k <- length(h) - idx_elbow
+  }else{
+    self$best_k <- 2
+  }
   # Start from k=3 (ignore 2-class division which is often an artifact)
-  idx <- which.min(d2[-(1:1)]) + 2
-  self$best_k <- length(h) - idx
+
+  self$best_k <- max(2, min(self$best_k, ncol(self$data) - 1))
   #message("[CAH] The ideal number of classes detected is: k =", self$best_k)
 
   invisible(self)
@@ -572,7 +582,13 @@ cutree = function(k=NULL) {
     k<- self$best_k
   }
   n_vars <- ncol(self$data)
-  if (k < 1 || k > n_vars - 1) {
+
+  # Validate k
+  if (!is.numeric(k) || length(k) != 1) {
+    stop("[CAH] k must be a single numeric value.")
+  }
+
+  if (k < 2 || k > n_vars) {
     stop("[CAH] k doit être entre 1 et ", n_vars - 1,
          " (nombre de variables - 1). Valeur fournie : k = ", k)
   }
@@ -581,6 +597,7 @@ cutree = function(k=NULL) {
   names(cl) <- colnames(self$data)
 
   self$clusters <- cl
+  self$k_current <- k
 
   # Compute latent components for each cluster (PCA)
   self$compo_latent <- list()
@@ -634,6 +651,7 @@ predict = function(X_new) {
   if (is.null(self$compo_latent)){
     stop("[CAH] Missing latent components (internal error).")
   }
+
   X <- as.data.frame(X_new)
 
   # Step 1 : Validation
@@ -650,17 +668,38 @@ predict = function(X_new) {
   nouv_clusters <- rep(NA, ncol(X))
   names(nouv_clusters) <- colnames(X)
 
+  if(length(self$compo_latent) == 0) {
+    stop("[CAH] No latent components available. This is an internal error.")
+  }
+
 
   for (j in seq_len(ncol(X))) {
     # STANDARDIZE the new variable
-    var_data_scaled <- scale(X[, j])
+    var_data <- X[, j]
+
+    # Check if variable is numeric
+    if (!is.numeric(var_data)) {
+      warning("[CAH] Variable '", colnames(X)[j], "' is not numeric and will be skipped.")
+      nouv_clusters[j] <- NA
+      next
+    }
+
+    var_data_scaled <- scale(var_data)
     cor_latent <- c()
 
     # Compute correlation with each cluster's latent component
     for (groupe in unique(self$clusters)) {
-      Zk <- self$compo_latent[[as.character(groupe)]]$Zk
-      cor_latent[as.character(groupe)] <- abs(cor(var_data_scaled, Zk))
+      groupe_str <- as.character(groupe)
+      if (!is.null(self$compo_latent[[groupe_str]])){
+      Zk <- self$compo_latent[[groupe_str]]$Zk
+      cor_latent[groupe_str] <- abs(cor(var_data_scaled, Zk))
+      }
+    }
 
+    if (length(cor_latent) == 0){
+      warning("[CAH] Could not compute correlations for variable '", colnames(X)[j], "'.")
+      nouv_clusters[j] <- NA
+      next
     }
 
     # Assign to cluster with highest correlation
@@ -678,26 +717,36 @@ predict = function(X_new) {
 
 },
 
+#' @description
+#' Plot various visualizations of the CAH model
+#' @param type Character string specifying plot type
 plot = function(type = "dendrogramme") {
   if (is.null(self$hc)){
     stop("[CAH] Call $fit() first.")
   }
   type <- tolower(type)
 
+  # Validate plot type
+  valid_types <- c("dendrogramme", "acp", "mds", "silhouette", "elbow")
+  if (!type %in% valid_types) {
+    stop("[CAH] Unknown plot type: '", type, "'. Use one of: ",
+         paste(valid_types, collapse = ", "))
+  }
+
   switch(type,
          "dendrogramme" = private$plot_dendrogramme(),
          "acp" = private$plot_acp(),
          "mds" = private$plot_mds(),
          "silhouette" = private$plot_silhouette(),
-         "elbow" = private$plot_elbow(),
-         stop("[CAH] Unknown plot type. Use: 'dendrogramme', 'acp', 'mds', 'silhouette', or 'elbow'")
+         "elbow" = private$plot_elbow()
          )
+
   invisible(self)
 },
 
 #' @description
 #' Print a summary of the CAH object
-#' @param Additional arguments (ignored)
+#' @param ... Additional arguments (ignored)
 #'
 print = function(...) {
   cat("\n──────────────────────────────────────────────\n")
@@ -807,10 +856,14 @@ summary = function(...) {
   cat("\n4. VARIABLE QUALITY (η²)\n")
   cat("__________________________\n")
   eta2 <- private$compute_eta_squared()
-  cat("Top variables by discriminant power:\n")
-  for (i in 1:min(5, length(eta2))) {
-    cat(sprintf("  %d. %s : %.4f %s\n", i, names(eta2)[i], eta2[i],
-                if (eta2[i] > 0.80) "✓✓" else if (eta2[i] > 0.60) "✓" else "~"))
+  if (length(eta2) > 0) {
+    cat("Top variables by discriminant power:\n")
+    for (i in 1:min(5, length(eta2))) {
+      cat(sprintf("  %d. %s: %.4f %s\n", i, names(eta2)[i], eta2[i],
+                  if (eta2[i] > 0.80) "✓✓" else if (eta2[i] > 0.60) "✓" else "~"))
+    }
+  } else {
+    cat("No η² values computed.\n")
   }
 
   # ===== SECTION 5 : VARIABLES DISTRIBUTION =====
@@ -829,10 +882,10 @@ summary = function(...) {
   # ===== SECTION 7 : LOCAL PCA (LATENT COMPONENTS) =====
   cat("\n6. LOCAL PCA - LATENT COMPONENTS PER GROUP\n")
   cat("_______________________________________________\n")
-  if (!is.null(self$compo_latent)) {
+  if (!is.null(self$compo_latent) && length(self$compo_latent) > 0) {
     for (group in sort(as.numeric(names(self$compo_latent)))) {
       compo <- self$compo_latent[[as.character(group)]]
-      cat("\n  Group ", group, ":\n")
+      cat("\n  Group ", group, ":\n", sep = "")
 
       if (length(compo$vars) > 1 && !is.null(compo$cor_vals)) {
         cor_vec <- as.numeric(compo$cor_vals)
@@ -840,9 +893,9 @@ summary = function(...) {
         cat("    Correlations² with latent component:\n")
         print(round(cor_vec^2, 3))
         best_var <- names(which.max(cor_vec^2))
-        cat("    → Representative variable (parangon): ", best_var, "\n")
+        cat("    → Representative variable (parangon): ", best_var, "\n", sep = "")
       } else {
-        cat("    Single variable: ", compo$vars, "\n")
+        cat("    Single variable: ", compo$vars, "\n", sep = "")
       }
     }
   }
@@ -858,18 +911,27 @@ summary = function(...) {
 
       nouv_vars <- names(self$predict_result)
       for (v in nouv_vars) {
-        var_data_scaled <- scale(self$X_last[, v])
-        cor_latent <- c()
+        if (!is.na(self$predict_result[v])) {
+          var_data <- self$X_last[, v]
 
-        for (group in unique(self$clusters)) {
-          Zk <- self$compo_latent[[as.character(group)]]$Zk
-          cor_latent[as.character(group)] <- abs(cor(var_data_scaled, Zk))
-        }
+          if (is.numeric(var_data)) {
+            var_data_scaled <- scale(var_data)
+            cor_latent <- c()
+
+            for (group in unique(self$clusters)) {
+              groupe_str <- as.character(group)
+              if (!is.null(self$compo_latent[[groupe_str]])) {
+                Zk <- self$compo_latent[[groupe_str]]$Zk
+                cor_latent[groupe_str] <- abs(cor(var_data_scaled, Zk))
+              }
+            }
 
         cat("\n  Variable ", v, ":\n")
         print(round(cor_latent, 3))
         best_cl <- as.numeric(names(which.max(cor_latent)))
         cat("  → Assigned to Group ", best_cl, "\n")
+          }
+        }
       }
     }
 
@@ -886,7 +948,7 @@ summary = function(...) {
 
   cat("\n╚═══════════════════════════════════════════════════════════╝\n\n")
   invisible(self)
-}
+    }
   ),
 
 # ============== PRIVATE FUNCTIONS ====================
@@ -925,9 +987,11 @@ private = list(
     for (j in 1:ncol(self$data)) {
       var_values <- self$data[, j]
       var_group <- self$clusters[j]
+      groupe_str <- as.character(var_group)
 
-      if (!is.null(self$compo_latent[[as.character(var_group)]])) {
-        Zk <- self$compo_latent[[as.character(var_group)]]$Zk
+      if (!is.null(self$compo_latent[[groupe_str]])) {
+        var_values <- self$data[, j]
+        Zk <- self$compo_latent[[groupe_str]]$Zk
         cor_val <- cor(var_values, Zk)
         eta_squared[colnames(self$data)[j]] <- cor_val^2
       }
@@ -1095,7 +1159,8 @@ private = list(
 
   plot_elbow = function() {
     h <- self$hc$height
-    plot(length(h):1, h,
+    n_clust <- length(h):1         # <-- AJOUTER CETTE LIGNE
+    plot(n_clust, h,
          type = "b",
          main = "Elbow Method - Height vs Number of Clusters",
          xlab = "Number of Clusters",
@@ -1110,7 +1175,11 @@ private = list(
            col = "red", pos = 4)
     }
 
-    grid(col = "gray", lty = 3, alpha = 0.5)
+    if (!is.null(self$k_current)){
+      abline(v = self$k_current, col = "blue", lty = 2, lwd = 2)
+    }
+
+    grid(col = "gray", lty = 3)
   }
 
   )
