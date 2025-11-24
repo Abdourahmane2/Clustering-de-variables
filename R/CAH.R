@@ -490,7 +490,7 @@ fit = function(data) {
 
   # Minimum size check
   if (nrow(df) < 3 || ncol(df) < 3 ) {
-    stop("[CAH] Not enough data: To perform a CAH, you need at least 2 individuals and 2 variables.")
+    stop("[CAH] Not enough data: To perform a CAH, you need at least 3 individuals and 3 variables.")
   }
   # Variable type verification
   type <- sapply (df, class)
@@ -539,7 +539,7 @@ fit = function(data) {
   #message("[CAH] Calculated correlation matrix (average correlation = ", round(self$corr_moy, 3), ").")
 
   # Distance matrix based on correlation
-  self$dist_matrix <- as.dist(sqrt(2 * (1 - abs(corr_matrix))))
+  self$dist_matrix <- as.dist(1 - abs(corr_matrix))
   #message("[CAH] Distance matrix created between variables (correlational).")
 
   # Hierarchical clustering
@@ -547,14 +547,17 @@ fit = function(data) {
   #message("[CAH] is performed using the method = ", method, ".")
 
   # Detect optimal k using elbow method
-  h <- self$hc$height
-  d1 <- diff(h)
-  d2 <- diff(d1)
+  h <- self$hc$height # Length = p - 1
 
-  if (length(d2) >= 2){
-    idx_in_d2 <- which.min(d2[2:length(d2)])
-    idx_elbow <- idx_in_d2 + 1
-    self$best_k <- length(h) - idx_elbow
+  if (length(h) >= 2){
+    diff_h <- diff(h)
+    idx_jump <- which.max(diff_h) # height jumps between merges (length = p - 2)
+
+    p <- ncol(self$data)
+
+    # Number of cluster if we cut just before the biggest jump
+    self$best_k <- p - idx_jump
+
   }else{
     self$best_k <- 2
   }
@@ -946,7 +949,7 @@ summary = function(...) {
     }
   }
 
-  cat("\n╚═══════════════════════════════════════════════════════════╝\n\n")
+  cat("\n____________________________________\n\n")
   invisible(self)
     }
   ),
@@ -1096,11 +1099,54 @@ private = list(
          col = col_vector,
          font = 2,
          cex = 0.9)
+    # SUPPLEMENTARY variables (if any)
+    if (!is.null(self$predict_result) && !is.null(self$X_last)) {
+      nouv_vars <- names(self$predict_result)
+
+      for (v in nouv_vars) {
+        if (!is.na(self$predict_result[v]) && is.numeric(self$X_last[, v])) {
+          # Compute correlation with PCs
+          var_data <- scale(self$X_last[, v])
+          pc1_cor <- cor(var_data, acp$x[, 1])
+          pc2_cor <- cor(var_data, acp$x[, 2])
+
+          # Normalize to unit circle
+          norm <- sqrt(pc1_cor^2 + pc2_cor^2)
+          if (norm > 0) {
+            pc1_cor <- pc1_cor / norm
+            pc2_cor <- pc2_cor / norm
+          }
+
+          # Get cluster color for this supplementary variable
+          assigned_cluster <- self$predict_result[v]
+          cluster_color <- colors[as.numeric(assigned_cluster)]
+
+          # Arrow in dashed line
+          arrows(0, 0, pc1_cor*0.9, pc2_cor*0.9,
+                 col = cluster_color, lwd = 2, length = 0.1, lty = 2)
+
+          # Text with asterisk to mark as supplementary
+          text(pc1_cor, pc2_cor,
+               paste(v, "*"),
+               col = cluster_color,
+               font = 3,  # Italic
+               cex = 0.85)
+        }
+      }
+    }
 
     theta <- seq(0, 2*pi, length.out = 100)
     lines(cos(theta), sin(theta), col = "gray", lty = 2, lwd = 0.5)
 
     abline(h = 0, v = 0, col = "gray", lty = 3)
+    # Legend
+    if (!is.null(self$predict_result)) {
+      legend("topright",
+             legend = c("Active variables", "Supplementary variables*"),
+             lty = c(1, 2),
+             lwd = c(1.5, 2),
+             cex = 0.85)
+    }
   },
 
   plot_mds = function() {
@@ -1133,7 +1179,56 @@ private = list(
          cex = 0.8,
          font = 2)
 
+    #SUPPLEMENTARY variables (if any)
+    if (!is.null(self$predict_result) && !is.null(self$X_last)) {
+      nouv_vars <- names(self$predict_result)
+
+      for (v in nouv_vars) {
+        if (!is.na(self$predict_result[v]) && is.numeric(self$X_last[, v])){
+          #Compute distance with all active variables
+          var_data <- self$X_last[, v]
+          var_data_scaled <- scale(var_data)
+
+          #Correlation with each active variable
+          corr_with_actives <- sapply(self$data, function(x) cor(var_data_scaled, scale(x)))
+
+          # Predict coordinates using correlation as weights
+          # Find closest active variables
+          assigned_cluster <- self$predict_result[v]
+          cluster_color <- colors[as.numeric(assigned_cluster)]
+
+          # Use weighted average of MDS coordinates based on correlations
+          weights <- pmax(abs(corr_with_actives), 0.1)  # Avoid zero weights
+          weights <- weights / sum(weights)
+
+          new_x <- sum(mds_coords[, 1] * weights)
+          new_y <- sum(mds_coords[, 2] * weights)
+
+          # Plot with different symbol (triangle instead of circle)
+          points(new_x, new_y,
+                 col = cluster_color,
+                 pch = 17,  # Triangle
+                 cex = 2)
+
+          # Text with asterisk
+          text(new_x, new_y,
+               paste(v, "*"),
+               col = cluster_color,
+               pos = 1,
+               cex = 0.75,
+               font = 3)
+        }
+      }
+    }
+
     abline(h = 0, v = 0, col = "gray", lty = 3)
+    # Legend
+    if (!is.null(self$predict_result)) {
+      legend("topright",
+             legend = c("Active variables (●)", "Supplementary variables* (△)"),
+             pch = c(19, 17),
+             cex = 0.85)
+    }
   },
 
   plot_silhouette = function() {
@@ -1159,7 +1254,7 @@ private = list(
 
   plot_elbow = function() {
     h <- self$hc$height
-    n_clust <- length(h):1         # <-- AJOUTER CETTE LIGNE
+    n_clust <- length(h):1
     plot(n_clust, h,
          type = "b",
          main = "Elbow Method - Height vs Number of Clusters",
