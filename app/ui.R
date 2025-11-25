@@ -4,13 +4,12 @@ library(DT)
 library(bslib)
 library(shinyjs)
 
-# Configuration globale pour accepter les gros fichiers (200 MB)
-options(shiny.maxRequestSize = 200 * 1024^2)
+# Configuration globale
+options(shiny.maxRequestSize = 1000 * 1024^2)
 
 ui <- navbarPage(
-  useShinyjs(),    #pour desactiver les buttons
+  useShinyjs(),
   id = "onglets",
-  #espace entre le nitre et les onglets
   title = div(
     style = "margin-right: 50px; font-weight: 600; font-size: 1.3em;",
     icon("project-diagram", style = "margin-right: 10px; color: #3498db;"),
@@ -31,10 +30,9 @@ ui <- navbarPage(
   ),
   collapsible = TRUE,
 
-  # Styles CSS personnalisés
+  # ===== STYLES CSS =====
   tags$head(
     tags$style(HTML("
-      /* Style général */
       body {
         font-family: 'Poppins', sans-serif;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -63,7 +61,6 @@ ui <- navbarPage(
         font-weight: 600;
       }
 
-      /* Cards améliorées */
       .card {
         background: white;
         border-radius: 15px;
@@ -79,7 +76,6 @@ ui <- navbarPage(
         box-shadow: 0 15px 40px rgba(0,0,0,0.15);
       }
 
-      /* Titres de sections */
       .section-title {
         color: #2c3e50;
         font-weight: 600;
@@ -95,7 +91,6 @@ ui <- navbarPage(
         color: #3498db;
       }
 
-      /* Boutons améliorés */
       .btn {
         border-radius: 8px;
         padding: 10px 20px;
@@ -125,7 +120,6 @@ ui <- navbarPage(
         color: white;
       }
 
-      /* Inputs améliorés */
       .form-control, .selectize-input {
         border-radius: 8px;
         border: 2px solid #e0e0e0;
@@ -138,20 +132,12 @@ ui <- navbarPage(
         box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
       }
 
-      /* Labels */
       label {
         color: #2c3e50;
         font-weight: 500;
         margin-bottom: 8px;
       }
 
-      /* Checkboxes */
-      .checkbox label {
-        font-weight: 400;
-        color: #555;
-      }
-
-      /* Sidebar */
       .well {
         background: white;
         border: none;
@@ -159,7 +145,6 @@ ui <- navbarPage(
         box-shadow: 0 10px 30px rgba(0,0,0,0.1);
       }
 
-      /* Tables DataTables */
       .dataTables_wrapper {
         padding: 15px;
       }
@@ -175,14 +160,12 @@ ui <- navbarPage(
         background-color: #f0f4ff;
       }
 
-      /* Help text */
       .help-block {
         color: #7f8c8d;
         font-size: 0.9em;
         font-style: italic;
       }
 
-      /* Tabs */
       .nav-tabs > li > a {
         border-radius: 8px 8px 0 0;
         font-weight: 500;
@@ -195,49 +178,17 @@ ui <- navbarPage(
         border: none;
       }
 
-      /* Outputs */
-      .shiny-output-error {
-        color: #e74c3c;
-        font-weight: 500;
-      }
-
-      pre {
-        background: #f8f9fa;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 15px;
-      }
-
-      /* Plots */
       .shiny-plot-output {
         border-radius: 10px;
         overflow: hidden;
         box-shadow: 0 5px 15px rgba(0,0,0,0.1);
       }
 
-      /* Progress indicators */
-      .shiny-notification {
-        border-radius: 10px;
-        font-weight: 500;
-      }
-
-      /* HR */
       hr {
         border-top: 2px solid #e0e0e0;
         margin: 25px 0;
       }
 
-      /* Icon enhancements */
-      .fa, .glyphicon {
-        margin-right: 8px;
-      }
-
-      /* Main panel content */
-      .col-sm-9 {
-        padding: 20px;
-      }
-
-      /* Action button container */
       .action-buttons {
         display: flex;
         flex-direction: column;
@@ -249,29 +200,6 @@ ui <- navbarPage(
         width: 100%;
       }
 
-      /* File input styling */
-      .btn-file {
-        background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-        color: white;
-        border-radius: 8px;
-      }
-
-      /* Container fluide */
-      .container-fluid {
-        padding: 30px;
-      }
-
-      /* Badge pour indicateur */
-      .badge-info {
-        background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-        color: white;
-        padding: 5px 12px;
-        border-radius: 20px;
-        font-size: 0.85em;
-        font-weight: 500;
-      }
-
-      /* Info box */
       .info-box {
         background: #e8f4f8;
         border-left: 4px solid #3498db;
@@ -285,7 +213,6 @@ ui <- navbarPage(
         margin-right: 10px;
       }
 
-      /* Variables selection boxes */
       .variables-box {
         background: #f8f9fa;
         border: 2px solid #e0e0e0;
@@ -305,10 +232,19 @@ ui <- navbarPage(
         border-color: #3498db;
         background: #f0f8ff;
       }
+
+      .badge-info {
+        background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        color: white;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.85em;
+        font-weight: 500;
+      }
     "))
   ),
 
-  # =============================== Page d'importation ===============================
+  # ===== PAGE 1: IMPORTATION =====
   tabPanel(
     title = tagList(icon("upload"), "Importation"),
     value = "Importation",
@@ -325,11 +261,10 @@ ui <- navbarPage(
               buttonLabel = "Parcourir...",
               placeholder = "Aucun fichier sélectionné"
             ),
-            # Indication de la taille maximale
-            helpText("📊 Taille maximale : 1GB", style = "color: #7f8c8d; font-size: 0.9em;"),
+            helpText("📊 Taille maximale : 1GB"),
             selectInput(
               "separateur",
-              label = tagList(icon("grip-lines"), "Séparateur"),
+              label = tagList(icon("grip-lines"), "Séparateur (CSV uniquement)"),
               choices = c(Virgule = ",",
                           `Point-virgule` = ";",
                           Tabulation = "\t")
@@ -346,16 +281,13 @@ ui <- navbarPage(
         div(class = "card",
             h4(class = "section-title",
                icon("table"), "Aperçu des données importées"),
-            DTOutput("tableau_import"),
-            hr(),
-            tableOutput("cluster"),
-            verbatimTextOutput("summary")
+            DTOutput("tableau_import")
         )
       )
     )
   ),
 
-  # =============================== Page de nettoyage ===============================
+  # ===== PAGE 2: NETTOYAGE =====
   tabPanel(
     title = tagList(icon("broom"), "Nettoyage"),
     value = "Nettoyage",
@@ -364,48 +296,41 @@ ui <- navbarPage(
         width = 3,
         div(class = "card",
             h4(class = "section-title",
-               icon("sliders-h"), "Options de nettoyage"),
+               icon("sliders-h"), "Configuration des variables"),
 
-            # NOUVEAU: Sélection des variables ACTIVES (pour le clustering)
             div(class = "variables-box variables-box-active",
                 h5(style = "color: #27ae60; font-weight: 600; margin-bottom: 10px;",
                    icon("check-circle"), " Variables actives"),
-                helpText("Ces variables seront utilisées pour construire le clustering",
-                         style = "color: #555; font-size: 0.85em; margin-bottom: 10px;"),
+                helpText("Variables utilisées pour le clustering"),
                 checkboxGroupInput(
                   "colonnes_actives",
                   label = NULL,
-                  choices = NULL,
-                  selected = NULL
+                  choices = NULL
                 )
             ),
 
             hr(),
 
-            # NOUVEAU: Sélection des variables ILLUSTRATIVES (pour la prédiction)
             div(class = "variables-box variables-box-illustrative",
                 h5(style = "color: #3498db; font-weight: 600; margin-bottom: 10px;",
                    icon("magic"), " Variables illustratives"),
-                helpText("Ces variables seront utilisées pour la prédiction (optionnel)",
-                         style = "color: #555; font-size: 0.85em; margin-bottom: 10px;"),
+                helpText("Variables pour la prédiction (optionnel)"),
                 checkboxGroupInput(
                   "colonnes_illustratives",
                   label = NULL,
-                  choices = NULL,
-                  selected = NULL
+                  choices = NULL
                 )
             ),
 
             hr(),
 
-            div(style = "background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;",
-                checkboxInput(
-                  "supprimer_na",
-                  HTML("<strong>Imputation des valeurs manquantes</strong><br>
-                       <small style='color: #7f8c8d;'>Remplacer les NA par la moyenne</small>"),
-                  value = FALSE
-                )
+            checkboxInput(
+              "supprimer_na",
+              HTML("<strong>Imputer les valeurs manquantes</strong><br>
+                   <small>Remplacer les NA par la moyenne (numériques)</small>"),
+              value = FALSE
             ),
+
             div(class = "action-buttons",
                 actionButton("nettoyer", "Appliquer le nettoyage",
                              icon = icon("magic"),
@@ -420,18 +345,17 @@ ui <- navbarPage(
         width = 9,
         div(class = "card",
             h4(class = "section-title",
-               icon("table"), "Tableau nettoyé"),
+               icon("table"), "Données après nettoyage"),
             tabsetPanel(
-              id = "tabs_nettoyage",
               tabPanel(
-                tagList(icon("eye"), "Aperçu du tableau"),
+                tagList(icon("eye"), "Aperçu"),
                 br(),
-                DTOutput("tableau_importe_nettoye_x")
+                DTOutput("tableau_nettoye")
               ),
               tabPanel(
                 tagList(icon("chart-bar"), "Statistiques"),
                 br(),
-                uiOutput("statistiques_x")
+                uiOutput("statistiques")
               )
             )
         )
@@ -439,7 +363,7 @@ ui <- navbarPage(
     )
   ),
 
-  # =============================== Page de clustering ===============================
+  # ===== PAGE 3: CLUSTERING =====
   tabPanel(
     title = tagList(icon("project-diagram"), "Clustering"),
     value = "Clustering",
@@ -448,17 +372,17 @@ ui <- navbarPage(
         width = 3,
         div(class = "card",
             h4(class = "section-title",
-               icon("cogs"), "Paramètres"),
+               icon("cogs"), "Paramètres du clustering"),
             selectInput(
               "method",
-              label = tagList(icon("puzzle-piece"), "Méthode de clustering"),
+              label = tagList(icon("puzzle-piece"), "Méthode"),
               choices = c("K-means" = "kmeans",
                           "ACM" = "ACM",
                           "CAH" = "CAH")
             ),
             numericInput("k",
-                         label = tagList(icon("hashtag"), "Nombre de clusters (k)"),
-                         value = 2,
+                         label = tagList(icon("hashtag"), "Nombre de clusters"),
+                         value = 3,
                          min = 2,
                          step = 1),
             hr(),
@@ -469,8 +393,7 @@ ui <- navbarPage(
                 actionButton("coude", "Méthode du coude",
                              icon = icon("chart-line"),
                              class = "btn-primary"),
-
-                actionButton("interpreter", "Résultats détaillés",
+                actionButton("interpreter", "Voir les résultats",
                              icon = icon("microscope"),
                              class = "btn-primary")
             )
@@ -480,118 +403,128 @@ ui <- navbarPage(
         width = 9,
         div(class = "card",
             h4(class = "section-title",
-               icon("database"), "Aperçu des données nettoyées"),
+               icon("database"), "Données utilisées"),
             DTOutput("tableau_cluster")
         ),
         div(class = "card",
             h4(class = "section-title",
-               icon("chart-pie"), "Résultats du clustering"),
-            DTOutput("resultat_cluster"),
-            hr(),
-            verbatimTextOutput("Résumé"),
-            verbatimTextOutput("summary"),
-            plotOutput("afficher_coude")
+               icon("chart-pie"), "Résumé du clustering"),
+            verbatimTextOutput("resume_clustering"),
+            plotOutput("plot_coude")
         )
       )
     )
   ),
 
-  #============  page de resultats du kmenas ==============================
+  # ===== PAGE 4: RÉSULTATS =====
   tabPanel(
     title = tagList(icon("chart-line"), "Résultats"),
-    value = "Résultats du Clustering",
+    value = "Résultats",
     fluidPage(
       div(class = "card",
           h4(class = "section-title",
-             icon("trophy"), "Analyse des résultats de clustering"),
+             icon("trophy"), "Analyse détaillée des résultats"),
 
-          # NOUVEAU: Badge d'information si variables illustratives chargées
-          uiOutput("badge_variables_exp"),
+          uiOutput("badge_variables"),
 
           tabsetPanel(
-            id = "tabs_resultats_clustering",
-            type = "tabs",
+            id = "tabs_resultats",
 
-            # Onglet 1 : Indicateurs de qualité
+            # Qualité
             tabPanel(
-              tagList(icon("star"), "Qualité du Clustering"),
+              tagList(icon("star"), "Qualité"),
               br(),
               div(class = "card",
-                  h4(style = "color: #2c3e50; font-weight: 600;",
-                     icon("gauge-high"), "Indicateurs de Qualité"),
+                  h4(icon("gauge-high"), "Indicateurs de qualité"),
                   verbatimTextOutput("qualite")
               )
             ),
 
-            # Onglet 2 : Visualisations
+            # Visualisations
             tabPanel(
               tagList(icon("chart-area"), "Visualisations"),
               br(),
 
+              # K-means
               conditionalPanel(
-              condition = "input.method == 'kmeans'",
-              div(class = "card",
-                  plotOutput("pca_plot", height = "500px") ,
-                  # plotOutput("visualisation_cah", height = "500px") ,
-                  # plotOutput("visualisation_acm", height = "500px")
+                condition = "input.method == 'kmeans'",
+                div(class = "card",
+                    plotOutput("pca_plot", height = "500px")
+                ),
+                br(),
+                div(class = "card",
+                    plotOutput("heatmap", height = "500px")
+                )
               ),
-              br(),
-              div(class = "card",
-                  plotOutput("heatmap", height = "500px")
+
+              # CAH
+              conditionalPanel(
+                condition = "input.method == 'CAH'",
+                div(class = "card",
+                    plotOutput("dendrogramme", height = "500px")
+                ),
+                br(),
+                div(class = "card",
+                    plotOutput("pca_cah", height = "500px")
+                ),
+                br(),
+                div(class = "card",
+                    plotOutput("mds_cah", height = "500px")
+                ),
+                br(),
+                div(class = "card",
+                    plotOutput("silhouette_cah", height = "500px")
+                )
+              ),
+
+              # ACM
+              conditionalPanel(
+                condition = "input.method == 'ACM'",
+                div(class = "card",
+                    plotOutput("dendrogramme_acm", height = "500px")
+                ),
+                br(),
+                div(class = "card",
+                    plotOutput("pca_acm", height = "500px")
+                ),
+                br(),
+                div(class = "card",
+                    plotOutput("mds_acm", height = "500px")
+                ),
+                br(),
+                div(class = "card",
+                    plotOutput("silhouette_acm", height = "500px")
+                )
               )
             ),
 
-            #CAH
-            conditionalPanel(
-              condition = "input.method == 'CAH'",
-              div(class = "card",
-                  plotOutput("dendrogramme_cah", height = "500px")
-              ),
-              br(),
-              div(class = "card",
-                  plotOutput("pca_plot_cah", height = "500px")
-              ),
-              br(),
-              div(class = "card",
-                  plotOutput("mds_cah", height = "500px")
-              ),
-              br(),
-              div(class = "card",
-                  plotOutput("silhouette_cah", height = "500px")
-              )
-            )
-            ),
-
-            # NOUVEAU: Onglet pour les prédictions avec variables illustratives
+            # Prédictions
             tabPanel(
               tagList(icon("magic"), "Prédictions"),
               br(),
               div(class = "card",
-                  h4(style = "color: #2c3e50; font-weight: 600;",
-                     icon("wand-magic-sparkles"), "Résultats des prédictions"),
+                  h4(icon("wand-magic-sparkles"), "Prédiction avec variables illustratives"),
 
-                  # Bouton pour lancer la prédiction si variables illustratives sélectionnées
                   conditionalPanel(
-                    condition = "output.has_exp_data == false",
+                    condition = "!output.has_illustratives",
                     div(class = "info-box",
                         icon("info-circle"),
                         strong("Aucune variable illustrative sélectionnée."),
                         br(),
-                        "Retournez à la page 'Nettoyage' pour sélectionner des variables illustratives."
+                        "Retournez à l'onglet 'Nettoyage' pour en sélectionner."
                     )
                   ),
 
                   conditionalPanel(
-                    condition = "output.has_exp_data == true",
-                    actionButton("Importer",
+                    condition = "output.has_illustratives",
+                    actionButton("lancer_prediction",
                                  "Lancer la prédiction",
                                  icon = icon("rocket"),
                                  class = "btn-success")
                   ),
 
-                  # Affichage des résultats si prédiction lancée
                   hr(),
-                  verbatimTextOutput("summary_output")
+                  verbatimTextOutput("resultats_prediction")
               )
             )
           )
