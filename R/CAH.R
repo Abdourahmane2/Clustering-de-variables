@@ -1212,73 +1212,25 @@ private = list(
          pos = 1,
          cex = 0.8,
          font = 2)
-
-    #SUPPLEMENTARY variables (if any)
-    if (!is.null(self$predict_result) && !is.null(self$X_last)) {
-      nouv_vars <- names(self$predict_result)
-
-      for (v in nouv_vars) {
-        if (!is.na(self$predict_result[v]) && is.numeric(self$X_last[, v])){
-          #Compute distance with all active variables
-          var_data <- self$X_last[, v]
-          var_data_scaled <- scale(var_data)
-
-          #Correlation with each active variable
-          corr_with_actives <- sapply(self$data, function(x) cor(var_data_scaled, scale(x)))
-
-          # Predict coordinates using correlation as weights
-          # Find closest active variables
-          assigned_cluster <- self$predict_result[v]
-          cluster_color <- colors[as.numeric(assigned_cluster)]
-
-          # Use weighted average of MDS coordinates based on correlations
-          weights <- pmax(abs(corr_with_actives), 0.1)  # Avoid zero weights
-          weights <- weights / sum(weights)
-
-          new_x <- sum(mds_coords[, 1] * weights)
-          new_y <- sum(mds_coords[, 2] * weights)
-
-          # Plot with different symbol (triangle instead of circle)
-          points(new_x, new_y,
-                 col = cluster_color,
-                 pch = 17,  # Triangle
-                 cex = 2)
-
-          # Text with asterisk
-          text(new_x, new_y,
-               paste(v, "*"),
-               col = cluster_color,
-               pos = 1,
-               cex = 0.75,
-               font = 3)
-        }
-      }
-    }
-
     abline(h = 0, v = 0, col = "gray", lty = 3)
-    # Legend
-    if (!is.null(self$predict_result)) {
-      legend("topright",
-             legend = c("Active variables (●)", "Supplementary variables* (△)"),
-             pch = c(19, 17),
-             cex = 0.85)
-    }
   },
 
   plot_silhouette = function() {
 
     sil <- private$compute_silhouette()
-    s <- sil$scores[order(sil$scores)]
+    s <- sil$scores
+    ord <- order(s)
 
-    cols <- ifelse(s > 0.5, viridis::viridis(3)[2],
-                   ifelse(s >= 0, viridis::viridis(3)[1], "red"))
+    # Create one color per cluster
+    clust <- self$clusters[ord]
+    cols <- viridis::viridis(length(unique(self$clusters)))[clust]
 
-    barplot(s,
+    barplot(s[ord],
             horiz = TRUE,
             col = cols,
             border = NA,
             xlab = "Silhouette",
-            main = "Silhouette plot",
+            main = "Silhouette plot (1 color per cluster)",
             las = 1,
             xlim = c(-1, 1))
 
