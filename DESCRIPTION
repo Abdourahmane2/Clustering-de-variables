@@ -27,8 +27,10 @@ Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Collate: 
-    CAH.R
-    mon_kmeans.R
-    clusterVariable.R
+    'ACM.R'
+    'ACM_Clustering_quali_tierce.R'
+    'CAH.R'
+    'mon_kmeans.R'
+    'clusterVariable.R'
 Depends: 
     R (>= 4.0.0)

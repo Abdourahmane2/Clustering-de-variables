@@ -218,6 +218,12 @@ server <- function(input, output, session) {
       return()
     }
 
+    if(input$method == "ACM" &&
+       !any(sapply(cleaned_data(), function(col) is.factor(col) || is.character(col)))) {
+      showNotification("ACM : au moins une colonne doit être qualitative (facteur ou caractère). essayer les autres algo", type = "warning  ")
+      return()
+    }
+
     # ---- KMEANS ----
     if (input$method == "kmeans") {
       model <- clusterVariable$new(k = input$k)
@@ -251,32 +257,59 @@ server <- function(input, output, session) {
       output$Résumé <- renderPrint(model$summary())
     }
 
+    # ---- ACM ----
     if(input$method == "ACM") {
-      #Partie de Marvin
+      model <- CAH_mixtes$new(n_components = 5)
+      model$fit(cleaned_data())
+
+      # NE PAS ÉCRASER model - stocker le résultat séparément
+      labels <- model$clustering_hierarchical(n_clusters = 3, method = "ward")
+
+      # Sauvegarder le modèle ORIGINAL (pas les labels)
+      model_reactif(model)
+
+      enable("coude")
+      enable("Importer")
+      enable("interpreter")
+
+      output$Résumé <- renderPrint(model$summary())
     }
   })
 
   # ===============================
   # 4. MÉTHODE DU COUDE
   # ===============================
-
-  observeEvent(input$coude, {
+  graphique_coude <- eventReactive(input$coude, {
     req(cleaned_data())
+    req(input$method)
 
     if (input$method == "kmeans") {
-      model <- clusterVariable$new(k = input$k)
-      model$fit(cleaned_data())
+      req(model_reactif())
+      model <- model_reactif()
+      return(model$plot_elbow())
 
-      output$afficher_coude <- renderPlot({
-        model$plot_elbow()
-      })
+    } else if (input$method == "CAH") {
+      # Méthode du coude pour CAH à implémenter
+      showNotification("La méthode du coude pour CAH n'est pas encore implémentée.", type = "info")
+      return(NULL)
+
+    } else if (input$method == "ACM") {
+      req(model_reactif())
+      model <- model_reactif()
+
+      # Vérifier si la méthode existe
+      if (!is.null(model$elbow_method)) {
+        return(model$elbow_method())
+      } else {
+        showNotification("La méthode du coude n'est pas disponible pour l'ACM.", type = "warning")
+        return(NULL)
+      }
     }
-    if (input$method == "CAH"){
-      #Miléna
-    }
-    if (input$method == "ACM"){
-      #Partie de Marvin
-    }
+  })
+
+  # Afficher le graphique
+  output$afficher_coude <- renderPlot({
+    graphique_coude()
   })
 
   # ===============================
@@ -306,27 +339,38 @@ server <- function(input, output, session) {
     } else if (input$method == "CAH") {
       model$summary()
     } else if (input$method == "ACM") {
-      cat("Résultats ACM à venir...")
+      model$qualite_clustering()
     }
   })
 
-  # Plot PCA
+  #================visualisations=================
   output$pca_plot <- renderPlot({
     req(model_reactif())
-    req(input$method == "kmeans")
-
     model <- model_reactif()
-    model$plot_clusters()
+
+    if (input$method == "kmeans") {
+      model$plot_clusters()
+    } else if (input$method == "CAH") {
+      #methode plot de milena
+    } else if (input$method == "ACM") {
+      model$plot_variables()
+    }
   })
 
-  # Heatmap
   output$heatmap <- renderPlot({
     req(model_reactif())
-    req(input$method == "kmeans")
-
     model <- model_reactif()
-    model$plot_heatmap()
+
+    if (input$method == "kmeans") {
+      model$plot_centers()
+    } else if (input$method == "CAH") {
+      #methode plot de milena
+    } else if (input$method == "ACM") {
+      model$dendo()
+    }
   })
+
+
 
   # ==================================================
   # 6. PRÉDICTION AVEC VARIABLES ILLUSTRATIVES
@@ -364,10 +408,11 @@ server <- function(input, output, session) {
 
     output$summary_output <- renderPrint({
       cat("=== Résultats de la prédiction ===\n")
-      pred <- model$summary()
+      pred <- model$predict()
     })
 
     showNotification("Prédiction effectuée avec succès !", type = "message")
     updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
   })
+
 }
