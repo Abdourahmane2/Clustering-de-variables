@@ -52,31 +52,28 @@ server <- function(input, output, session) {
 
   # SYNCHRONISATION SIMPLE - Quand ACTIVES changent
   observeEvent(input$colonnes_actives, {
-    colonnes_illus_actuelles <- input$colonnes_illustratives
-    colonnes_actives_nouvelles <- input$colonnes_actives
+    illus_current <- input$colonnes_illustratives
+    actives_current <- input$colonnes_actives
 
-    # Retirer des illustratives les colonnes qui sont en actives
-    colonnes_illus_mises_a_jour <- setdiff(colonnes_illus_actuelles, colonnes_actives_nouvelles)
+    new_illus <- setdiff(illus_current, actives_current)
 
-    if (!identical(colonnes_illus_mises_a_jour, colonnes_illus_actuelles)) {
-      updateCheckboxGroupInput(session, "colonnes_illustratives",
-                               selected = colonnes_illus_mises_a_jour)
+    if (!identical(new_illus, illus_current)){
+      updateCheckboxGroupInput(session, "colonnes_illustratives", selected = new_illus)
     }
-  }, ignoreNULL = FALSE)
+  })
 
   # SYNCHRONISATION SIMPLE - Quand ILLUSTRATIVES changent
   observeEvent(input$colonnes_illustratives, {
-    colonnes_actives_actuelles <- input$colonnes_actives
-    colonnes_illus_nouvelles <- input$colonnes_illustratives
+    actives_current <- input$colonnes_actives
+    illus_current <- input$colonnes_illustratives
 
     # Retirer des actives les colonnes qui sont en illustratives
-    colonnes_actives_mises_a_jour <- setdiff(colonnes_actives_actuelles, colonnes_illus_nouvelles)
+    new_actives <- setdiff(actives_current, illus_current)
 
-    if (!identical(colonnes_actives_mises_a_jour, colonnes_actives_actuelles)) {
-      updateCheckboxGroupInput(session, "colonnes_actives",
-                               selected = colonnes_actives_mises_a_jour)
+    if (!identical(new_actives, actives_current)) {
+      updateCheckboxGroupInput(session, "colonnes_actives", selected = new_actives)
     }
-  }, ignoreNULL = FALSE)
+  })
 
   # --- Bouton valider ---
   observeEvent(input$valider, {
@@ -218,12 +215,6 @@ server <- function(input, output, session) {
       return()
     }
 
-    if(input$method == "ACM" &&
-       !any(sapply(cleaned_data(), function(col) is.factor(col) || is.character(col)))) {
-      showNotification("ACM : au moins une colonne doit être qualitative (facteur ou caractère). essayer les autres algo", type = "warning  ")
-      return()
-    }
-
     # ---- KMEANS ----
     if (input$method == "kmeans") {
       model <- clusterVariable$new(k = input$k)
@@ -254,62 +245,45 @@ server <- function(input, output, session) {
       enable("Importer")
       enable("interpreter")
 
-      output$Résumé <- renderPrint(model$summary())
+      output$Résumé <- renderPrint(model$print())
     }
 
-    # ---- ACM ----
     if(input$method == "ACM") {
-      model <- CAH_mixtes$new(n_components = 5)
-      model$fit(cleaned_data())
-
-      # NE PAS ÉCRASER model - stocker le résultat séparément
-      labels <- model$clustering_hierarchical(n_clusters = 3, method = "ward")
-
-      # Sauvegarder le modèle ORIGINAL (pas les labels)
-      model_reactif(model)
-
-      enable("coude")
-      enable("Importer")
-      enable("interpreter")
-
-      output$Résumé <- renderPrint(model$summary())
+      #Partie de Marvin
     }
   })
 
   # ===============================
   # 4. MÉTHODE DU COUDE
   # ===============================
-  graphique_coude <- eventReactive(input$coude, {
+
+  observeEvent(input$coude, {
     req(cleaned_data())
-    req(input$method)
 
     if (input$method == "kmeans") {
-      req(model_reactif())
-      model <- model_reactif()
-      return(model$plot_elbow())
+      model <- clusterVariable$new(k = input$k)
+      model$fit(cleaned_data())
 
-    } else if (input$method == "CAH") {
-      # Méthode du coude pour CAH à implémenter
-      showNotification("La méthode du coude pour CAH n'est pas encore implémentée.", type = "info")
-      return(NULL)
-
-    } else if (input$method == "ACM") {
-      req(model_reactif())
-      model <- model_reactif()
-
-      # Vérifier si la méthode existe
-      if (!is.null(model$elbow_method)) {
-        return(model$elbow_method())
-      } else {
-        showNotification("La méthode du coude n'est pas disponible pour l'ACM.", type = "warning")
-        return(NULL)
-      }
+      output$afficher_coude <- renderPlot({
+        model$plot_elbow()
+      })
     }
-  })
+    if (input$method == "CAH"){
+      k_val <- suppressWarnings(as.numeric(input$k))
+      if (is.na(k_val) || k_val <= 1) k_val <- NULL
 
-  # Afficher le graphique
-  output$afficher_coude <- renderPlot({
-    graphique_coude()
+      model <- CAH$new("ward.D2")
+      model$fit(cleaned_data())
+      model$cutree(k = k_val)
+
+      output$afficher_coude <- renderPlot({
+        model$plot("elbow")
+      })
+    }
+
+    if (input$method == "ACM"){
+      #Partie de Marvin
+    }
   })
 
   # ===============================
@@ -339,38 +313,60 @@ server <- function(input, output, session) {
     } else if (input$method == "CAH") {
       model$summary()
     } else if (input$method == "ACM") {
-      model$qualite_clustering()
+      cat("Résultats ACM à venir...")
     }
   })
 
-  #================visualisations=================
+  # Plot PCA pour Kmeans
   output$pca_plot <- renderPlot({
     req(model_reactif())
-    model <- model_reactif()
+    req(input$method == "kmeans")
 
-    if (input$method == "kmeans") {
-      model$plot_clusters()
-    } else if (input$method == "CAH") {
-      #methode plot de milena
-    } else if (input$method == "ACM") {
-      model$plot_variables()
-    }
+    model <- model_reactif()
+    model$plot_clusters()
   })
 
+  # Plot PCA pour CAH
+  output$pca_plot_cah <- renderPlot({
+    req(model_reactif())
+    req(input$method == "CAH")
+    model <- model_reactif()
+    model$plot("acp")
+  })
+
+  #Plot Dendrogram pour CAH
+  output$dendrogramme_cah <- renderPlot({
+    req(model_reactif())
+    req(input$method == "CAH")
+    model <- model_reactif()
+    model$plot("dendrogramme")
+  })
+
+  # Plot Silhouette pour CAH
+  output$silhouette_cah <- renderPlot({
+    req(model_reactif())
+    req(input$method == "CAH")
+    model <- model_reactif()
+    model$plot("silhouette")
+  })
+
+  # Plot MDS pour CAH
+  output$mds_cah <- renderPlot({
+    req(model_reactif())
+    req(input$method == "CAH")
+    model <- model_reactif()
+    model$plot("mds")
+  })
+
+
+  # Heatmap
   output$heatmap <- renderPlot({
     req(model_reactif())
+    req(input$method == "kmeans")
+
     model <- model_reactif()
-
-    if (input$method == "kmeans") {
-      model$plot_centers()
-    } else if (input$method == "CAH") {
-      #methode plot de milena
-    } else if (input$method == "ACM") {
-      model$dendo()
-    }
+    model$plot_heatmap()
   })
-
-
 
   # ==================================================
   # 6. PRÉDICTION AVEC VARIABLES ILLUSTRATIVES
@@ -408,11 +404,10 @@ server <- function(input, output, session) {
 
     output$summary_output <- renderPrint({
       cat("=== Résultats de la prédiction ===\n")
-      pred <- model$predict()
+      pred <- model$summary()
     })
 
     showNotification("Prédiction effectuée avec succès !", type = "message")
     updateNavbarPage(session, "onglets", selected = "Résultats du Clustering")
   })
-
 }
