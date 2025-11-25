@@ -540,7 +540,7 @@ fit = function(data) {
 
   # Distance matrix based on correlation
   self$dist_matrix <- as.dist(1 - abs(corr_matrix))
-  #message("[CAH] Distance matrix created between variables (correlational).")
+  #message("[CAH] Distance matrix created between variables (correlational) -> pearson absolute.")
 
   # Hierarchical clustering
   self$hc <- hclust(self$dist_matrix, method = self$method)
@@ -591,13 +591,13 @@ cutree = function(k=NULL) {
     stop("[CAH] k must be a single numeric value.")
   }
 
-  if (k < 2 || k > n_vars) {
-    stop("[CAH] k doit être entre 1 et ", n_vars - 1,
-         " (nombre de variables - 1). Valeur fournie : k = ", k)
+  if (k < 2 || k > (n_vars - 1)) {
+    stop("[CAH] k must be between 2 and ", n_vars - 1,
+         " (number totale of variables - 1). Provided value : k = ", k)
   }
 
   cl <- cutree(self$hc, k=k)
-  names(cl) <- colnames(self$data)
+  names(cl) <- colnames(self$data) # Labeling
 
   self$clusters <- cl
   self$k_current <- k
@@ -657,6 +657,7 @@ predict = function(X_new) {
 
   X <- as.data.frame(X_new)
 
+
   # Step 1 : Validation
   if (nrow(X) != nrow(self$data)) {
     stop("[CAH] The number of individuals must be identical to that in our base dataframe.")
@@ -668,46 +669,34 @@ predict = function(X_new) {
   self$X_last <- X
 
   # Assign new variables to cluster
-  nouv_clusters <- rep(NA, ncol(X))
-  names(nouv_clusters) <- colnames(X)
+  nouv_clusters <- setNames(rep(NA, ncol(X)), colnames(X))
 
-  if(length(self$compo_latent) == 0) {
-    stop("[CAH] No latent components available. This is an internal error.")
+  for (var_name in colnames(X)) {
+
+    var_data <- X[[var_name]]
+
+
+
+    # Must be numeric
+    if (!is.numeric(var_data)) {
+      warning("[CAH] Variable '", var_name, "' is not numeric and will be skipped.")
+      nouv_clusters[var_name] <- NA
+      next
+    }
+
+  #Locale Standardization
+  var_scaled <- as.vector(scale(var_data))
+
+    # Calcul des corrélations avec chaque composante latente Z_k
+    cor_latent <- c()
+  for (groupe in names(self$compo_latent)) {
+    Zk <- self$compo_latent[[groupe]]$Zk
+    cor_latent[groupe] <- abs(cor(var_scaled, Zk))
   }
 
-
-  for (j in seq_len(ncol(X))) {
-    # STANDARDIZE the new variable
-    var_data <- X[, j]
-
-    # Check if variable is numeric
-    if (!is.numeric(var_data)) {
-      warning("[CAH] Variable '", colnames(X)[j], "' is not numeric and will be skipped.")
-      nouv_clusters[j] <- NA
-      next
-    }
-
-    var_data_scaled <- scale(var_data)
-    cor_latent <- c()
-
-    # Compute correlation with each cluster's latent component
-    for (groupe in unique(self$clusters)) {
-      groupe_str <- as.character(groupe)
-      if (!is.null(self$compo_latent[[groupe_str]])){
-      Zk <- self$compo_latent[[groupe_str]]$Zk
-      cor_latent[groupe_str] <- abs(cor(var_data_scaled, Zk))
-      }
-    }
-
-    if (length(cor_latent) == 0){
-      warning("[CAH] Could not compute correlations for variable '", colnames(X)[j], "'.")
-      nouv_clusters[j] <- NA
-      next
-    }
-
-    # Assign to cluster with highest correlation
-    best_cluster <- as.numeric(names(which.max(cor_latent)))
-    nouv_clusters[j] <- best_cluster
+  # Choix du cluster = argmax_k |corr|
+  best_cluster <- as.numeric(names(which.max(cor_latent)))
+  nouv_clusters[var_name] <- best_cluster
   }
 
   # Save the result
@@ -717,7 +706,6 @@ predict = function(X_new) {
   print(nouv_clusters)
 
   invisible(self)
-
 },
 
 #' @description
@@ -753,50 +741,108 @@ plot = function(type = "dendrogramme") {
 #'
 print = function(...) {
   cat("\n──────────────────────────────────────────────\n")
-  cat("    Hierarchical Clustering on Variables (HCA)\n")
+  cat("       Hierarchical Clustering on Variables\n")
   cat("──────────────────────────────────────────────\n")
 
-  # Checking the data
+  # --- CHECK DATA ---
   if (is.null(self$data)) {
-    cat(" No data loaded.\n")
-    cat("Call $fit(data) to load and fit the model.\n")
+    cat(" No data loaded.\nCall $fit(data) first.\n")
     return(invisible(self))
   }
 
-  # General informations
-  cat(" Data: ", nrow(self$data), " individuals × ", ncol(self$data), " variables\n", sep = "")
-  cat(" Aggregation method: ", ifelse(is.null(self$method), "non spécifiée", self$method), "\n")
-  cat(" Distance method:", ifelse(is.null(self$dist_method), "corrélation", self$dist_method), "\n")
+  # --- GENERAL INFO ---
+  cat(" Data: ", nrow(self$data), " individuals × ", ncol(self$data), " variables\n", sep="")
+  cat(" Aggregation method: ", self$method, "\n")
+  cat(" Distance method: ", self$dist_method, "\n")
+  cat(" Average correlation: ", round(self$corr_moy, 3), "\n")
 
-  # Correlation
-  if (!is.null(self$corr_moy)) {
-    cat(" Average correlation:", round(self$corr_moy, 3), "\n")
+  if (!is.null(self$best_k))
+    cat(" Optimal k detected: ", self$best_k, "\n")
+
+  if (is.null(self$clusters)) {
+    cat("\n Partitioning not performed yet. Call $cutree().\n")
+    return(invisible(self))
   }
 
-  # Nombre optimal de clusters
-  if (!is.null(self$best_k)) {
-    cat(" Optimal k detected :", self$best_k, "\n")
-  } else {
-    cat(" Optimal k: not determined (call $fit())\n")
+  # =====================================================
+  #                1. CLUSTERS SUMMARY
+  # =====================================================
+  cat("\n1. CLUSTERS SUMMARY\n")
+  cat("______________________________\n")
+
+  tb <- table(self$clusters)
+  for (g in sort(unique(self$clusters))) {
+    cat(" Cluster ", g, " (", tb[g], " variables)\n", sep="")
   }
 
-  # Preparation of the clusters
-  if (!is.null(self$clusters)) {
-    tb <- table(self$clusters)
-    cat(" Variables per cluster:\n")
-    print(tb)
-  } else {
-    cat(" Partitioning: not done (call $cutree())\n")
+  # =====================================================
+  #       2. BEST K — BSS Ratio + GAP (SAFE VERSION)
+  # =====================================================
+  cat("\n2. BEST CLUSTER SELECTION (Internal)\n")
+  cat("____________________________________\n")
+
+  p <- ncol(self$data)
+  ks <- 2:(p-1)
+
+  BSS_ratio_values <- numeric(length(ks))
+  names(BSS_ratio_values) <- ks
+
+  # Save original partition
+  old_clusters <- self$clusters
+
+  # Compute BSS ratio for each k
+  for (i in seq_along(ks)) {
+    k <- ks[i]
+
+    # Temporary clustering
+    cl_temp <- cutree(self$hc, k = k)
+    self$clusters <- cl_temp
+
+    BSS_ratio_values[i] <- private$compute_BSS_ratio()
   }
 
-  # Illustrative variables added (via predict)
-  if (!is.null(self$predict_result)) {
-    cat("Supplementary variables added: ", length(self$predict_result), "\n")
+  # Restore the true partition!
+  self$clusters <- old_clusters
+
+  # GAP computation
+  GAP_values <- private$compute_gap(BSS_ratio_values)
+
+  cat("Clusters |  BSS Ratio  |   GAP\n")
+  for (i in seq_along(ks)) {
+    cat(sprintf("%7d  |   %8.4f  |  %6.3f\n",
+                ks[i], BSS_ratio_values[i], GAP_values[i]))
+  }
+  cat(" → Best k = largest GAP jump.\n")
+
+  # =====================================================
+  #                3. CLUSTER CENTROIDS
+  # =====================================================
+  cat("\n3. CLUSTER CENTROIDS (Barycenters)\n")
+  cat("____________________________________\n")
+
+  centroids <- private$compute_centroids()
+  vars <- colnames(self$data)
+
+  mat <- sapply(centroids, function(c) c[vars])
+  rownames(mat) <- vars
+
+  print(round(mat, 3))
+
+  # =====================================================
+  #          4. VARIABLE → CLUSTER MEMBERSHIP
+  # =====================================================
+  cat("\n4. VARIABLES MEMBERSHIP\n")
+  cat("____________________________________\n")
+
+  for (v in names(old_clusters)) {
+    cat("  ", v, " → Cluster ", old_clusters[v], "\n", sep="")
   }
 
-  cat("──────────────────────────────────────────────\n\n")
+  cat("\n──────────────────────────────────────────────\n")
   invisible(self)
 },
+
+
 
 #' @description
 #' Print a detailed summary of the CAH model
@@ -850,10 +896,6 @@ summary = function(...) {
               if (sil$mean_score > 0.6) "✓✓ Excellent (>0.6)"
               else if (sil$mean_score > 0.4) "✓ Good (0.4-0.6)"
               else "~ Acceptable (<0.4)"))
-
-  ch <- private$compute_calinski_harabasz()
-  cat(sprintf("\nCalinski-Harabasz = %.4f\n", ch))
-  cat(sprintf("  → Higher is better (helps find optimal k)\n"))
 
   # ===== SECTION 4 : VARIABLE QUALITY =====
   cat("\n4. VARIABLE QUALITY (η²)\n")
@@ -958,105 +1000,144 @@ summary = function(...) {
 
 private = list(
 
-  compute_r_squared = function() {
-    grand_mean <- colMeans(self$data)
-
-    # Use sweep to subtract grand_mean from each column
-    inertia_total <- sum(sweep(as.matrix(self$data), 2, grand_mean, "-")^2)
-
-    inertia_between <- 0
-    for (groupe in unique(self$clusters)) {
-      data_groupe <- self$data[, self$clusters == groupe, drop = FALSE]
-      centre_groupe <- colMeans(data_groupe)
-      n_groupe <- ncol(data_groupe)
-      inertia_between <- inertia_between +
-        n_groupe * sum((centre_groupe - grand_mean[self$clusters == groupe])^2)
-    }
-
-    r_squared <- inertia_between / inertia_total
-
-    return(list(
-      r_squared = r_squared,
-      percentage = round(100 * r_squared, 2),
-      inertia_between = inertia_between,
-      inertia_total = inertia_total
-    ))
-  },
-
   compute_eta_squared = function() {
-    eta_squared <- rep(0, ncol(self$data))
-    names(eta_squared) <- colnames(self$data)
+    eta <- rep(0, length(self$clusters))
+    names(eta) <- names(self$clusters)
 
-    for (j in 1:ncol(self$data)) {
-      var_values <- self$data[, j]
-      var_group <- self$clusters[j]
-      groupe_str <- as.character(var_group)
+    for (g in names(self$compo_latent)){
+      comp <- self$compo_latent[[g]]
 
-      if (!is.null(self$compo_latent[[groupe_str]])) {
-        var_values <- self$data[, j]
-        Zk <- self$compo_latent[[groupe_str]]$Zk
-        cor_val <- cor(var_values, Zk)
-        eta_squared[colnames(self$data)[j]] <- cor_val^2
+      if (length(comp$vars) == 1){
+        eta[comp$vars] <- 1
+      } else {
+        eta[comp$vars] <- comp$cor_vals^2
       }
     }
 
-    return(sort(eta_squared, decreasing = TRUE))
+    return(sort(eta, decreasing = TRUE))
+  },
+
+  compute_r_squared = function() {
+    eta2 <- private$compute_eta_squared()
+    r2 <- mean(eta2)
+
+    return(list(
+      r_squared = r2,
+      percentage = round(100 * r2, 2)
+    ))
+  },
+
+  compute_BSS = function() {
+    # Standardisation des variables (colonnes)
+    X <- scale(self$data)              # n × p
+    clusters <- self$clusters
+    if (is.null(clusters)) stop("[CAH] No clusters available for BSS.")
+
+    # Chaque variable est un point en dimension n
+    global_center <- rowMeans(X)       # vecteur de taille n
+
+    BSS <- 0
+    for (g in unique(clusters)) {
+      vars_g_idx <- which(clusters == g)
+      Xg <- X[, vars_g_idx, drop = FALSE]       # n × |C_g|
+      z_g <- rowMeans(Xg)                       # barycentre du groupe (longueur n)
+      BSS <- BSS + length(vars_g_idx) * sum((z_g - global_center)^2)
+    }
+
+    return(BSS)
+  },
+
+  compute_WSS = function() {
+    X <- scale(self$data)
+    clusters <- self$clusters
+    if (is.null(clusters)) stop("[CAH] No clusters available for WSS.")
+
+    WSS <- 0
+    for (g in unique(clusters)) {
+      vars_g_idx <- which(clusters == g)
+      Xg <- X[, vars_g_idx, drop = FALSE]
+      z_g <- rowMeans(Xg)
+
+      # Somme des distances au carré de chaque variable à son barycentre
+      for (j in seq_along(vars_g_idx)) {
+        x_j <- Xg[, j]
+        WSS <- WSS + sum((x_j - z_g)^2)
+      }
+    }
+
+    return(WSS)
+  },
+
+  compute_BSS_ratio = function() {
+    B <- private$compute_BSS()
+    W <- private$compute_WSS()
+    if ((B + W) == 0) {
+      return(0)
+    }
+    return(B / (B + W))
+  },
+
+
+  compute_gap = function(BSS_progression) {
+    if (length(BSS_progression) < 2)
+      return(rep(0, length(BSS_progression)))
+    gap <- c(0, diff(BSS_progression))
+    return(gap)
+  },
+
+  compute_centroids = function() {
+
+    clusters <- self$clusters
+    data <- self$data
+    groups <- sort(unique(clusters))
+
+    centroids <- list()
+
+    for (g in groups) {
+      vars_g <- names(clusters[clusters == g])
+
+      centroids[[as.character(g)]] <- colMeans(
+        data[, vars_g, drop = FALSE]
+      )
+    }
+
+    return(centroids)
   },
 
   compute_silhouette = function() {
+
     dist_mat <- as.matrix(self$dist_matrix)
-    n_vars <- ncol(self$data)
-    silhouette_scores <- rep(0, n_vars)
+    clusters <- self$clusters
+    n <- length(clusters)
+    sil <- numeric(n)
 
-    for (i in 1:n_vars) {
-      groupe_i <- self$clusters[i]
-      vars_same_group <- which(self$clusters == groupe_i)
+    for (i in seq_len(n)) {
 
-      if (length(vars_same_group) > 1) {
-        a_i <- mean(dist_mat[i, vars_same_group[-which(vars_same_group == i)]])
-      } else {
+      g <- clusters[i]
+      in_g <- which(clusters == g)
+
+      # a(i) : average distance inside the same cluster
+      if (length(in_g) > 1)
+        a_i <- mean(dist_mat[i, in_g[in_g != i]])
+      else
         a_i <- 0
-      }
 
-      other_groups <- unique(self$clusters[self$clusters != groupe_i])
+      # b(i) : smallest average distance to another cluster
       b_i <- Inf
-
-      for (groupe_j in other_groups) {
-        vars_other_group <- which(self$clusters == groupe_j)
-        dist_to_j <- mean(dist_mat[i, vars_other_group])
-        b_i <- min(b_i, dist_to_j)
+      for (g2 in unique(clusters)[unique(clusters) != g]) {
+        out_g <- which(clusters == g2)
+        b_i <- min(b_i, mean(dist_mat[i, out_g]))
       }
 
-      if (max(a_i, b_i) > 0) {
-        silhouette_scores[i] <- (b_i - a_i) / max(a_i, b_i)
-      } else {
-        silhouette_scores[i] <- 0
-      }
+      sil[i] <- (b_i - a_i) / max(a_i, b_i)
     }
 
-    names(silhouette_scores) <- colnames(self$data)
+    names(sil) <- names(clusters)
 
     return(list(
-      scores = silhouette_scores,
-      mean_score = mean(silhouette_scores)
+      scores = sil,
+      mean_score = mean(sil)
     ))
-  },
-
-  compute_calinski_harabasz = function() {
-    r2_info <- private$compute_r_squared()
-
-    n_vars <- ncol(self$data)
-    k <- length(unique(self$clusters))
-    b <- r2_info$inertia_between
-    w <- r2_info$inertia_total - b
-
-    if (k > 1 && n_vars > k) {
-      ch_index <- (b / (k - 1)) / (w / (n_vars - k))
-    } else {
-      ch_index <- 0
-    }
-
-    return(ch_index)
   },
 
   plot_dendrogramme = function() {
@@ -1099,55 +1180,8 @@ private = list(
          col = col_vector,
          font = 2,
          cex = 0.9)
-    # SUPPLEMENTARY variables (if any)
-    if (!is.null(self$predict_result) && !is.null(self$X_last)) {
-      nouv_vars <- names(self$predict_result)
 
-      for (v in nouv_vars) {
-        if (!is.na(self$predict_result[v]) && is.numeric(self$X_last[, v])) {
-          # Compute correlation with PCs
-          var_data <- scale(self$X_last[, v])
-          pc1_cor <- cor(var_data, acp$x[, 1])
-          pc2_cor <- cor(var_data, acp$x[, 2])
-
-          # Normalize to unit circle
-          norm <- sqrt(pc1_cor^2 + pc2_cor^2)
-          if (norm > 0) {
-            pc1_cor <- pc1_cor / norm
-            pc2_cor <- pc2_cor / norm
-          }
-
-          # Get cluster color for this supplementary variable
-          assigned_cluster <- self$predict_result[v]
-          cluster_color <- colors[as.numeric(assigned_cluster)]
-
-          # Arrow in dashed line
-          arrows(0, 0, pc1_cor*0.9, pc2_cor*0.9,
-                 col = cluster_color, lwd = 2, length = 0.1, lty = 2)
-
-          # Text with asterisk to mark as supplementary
-          text(pc1_cor, pc2_cor,
-               paste(v, "*"),
-               col = cluster_color,
-               font = 3,  # Italic
-               cex = 0.85)
-        }
-      }
-    }
-
-    theta <- seq(0, 2*pi, length.out = 100)
-    lines(cos(theta), sin(theta), col = "gray", lty = 2, lwd = 0.5)
-
-    abline(h = 0, v = 0, col = "gray", lty = 3)
-    # Legend
-    if (!is.null(self$predict_result)) {
-      legend("topright",
-             legend = c("Active variables", "Supplementary variables*"),
-             lty = c(1, 2),
-             lwd = c(1.5, 2),
-             cex = 0.85)
-    }
-  },
+        },
 
   plot_mds = function() {
     mds_coords <- cmdscale(self$dist_matrix, k = 2)
@@ -1232,25 +1266,26 @@ private = list(
   },
 
   plot_silhouette = function() {
+
     sil <- private$compute_silhouette()
-    sil_sorted <- sort(sil$scores)
+    s <- sil$scores[order(sil$scores)]
 
-    colors <- ifelse(sil_sorted > 0.5, "darkgreen",
-                     ifelse(sil_sorted >= 0, "orange", "red"))
+    cols <- ifelse(s > 0.5, viridis::viridis(3)[2],
+                   ifelse(s >= 0, viridis::viridis(3)[1], "red"))
 
-    barplot(sil_sorted,
+    barplot(s,
             horiz = TRUE,
-            col = colors,
+            col = cols,
+            border = NA,
+            xlab = "Silhouette",
+            main = "Silhouette plot",
             las = 1,
-            xlab = "Silhouette Score",
-            main = "Silhouette Plot",
-            xlim = c(-1, 1),
-            border = NA)
+            xlim = c(-1, 1))
 
-    abline(v = 0, col = "black", lwd = 1)
-    abline(v = sil$mean_score, col = "red", lty = 2, lwd = 2)
-    abline(v = c(-0.5, 0.5), col = "gray", lty = 3)
+    abline(v = sil$mean_score, col = "black", lwd = 2, lty = 2)
+    abline(v = 0, col = "gray50")
   },
+
 
   plot_elbow = function() {
     h <- self$hc$height
