@@ -254,16 +254,20 @@ server <- function(input, output, session) {
     k_val <- as.integer(input$k)
 
     # Validation
-    if (is.na(k_val) || k_val < 2) {
-      showNotification("Le nombre de clusters doit être ≥ 2", type = "error")
-      return()
-    }
+    if (input$method %in% c("kmeans", "ACM")) {
+      if (is.na(k_val) || k_val < 2) {
+        showNotification("Le nombre de clusters doit être ≥ 2",
+                         type = "error")
+        return()
+      }
+
 
     if (k_val >= nrow(df)) {
       showNotification("Le nombre de clusters doit être < nombre de lignes",
                        type = "error")
       return()
     }
+  }
 
     tryCatch({
       if (input$method == "kmeans") {
@@ -295,14 +299,24 @@ server <- function(input, output, session) {
           return()
         }
 
-        mod <- CAH$new("ward.D2")
+        # Créer le modèle avec la bonne syntaxe
+        mod <- CAH$new(method = "ward.D2")
+
+        # Entraîner
         mod$fit(df)
-        mod$cutree(k = k_val)
+
+        # Si l’utilisateur a choisi k → on coupe
+        if (!is.na(k_val) && k_val >= 2) {
+          mod$cutree(k = k_val)
+        }else {
+          mod$cutree()
+        }
+
+        # Sauvegarder le modèle
         model(mod)
 
-        output$resume_clustering <- renderPrint({
-          mod$print()
-        })
+        # Résumé
+        output$resume_clustering <- renderPrint(mod$print())
 
         enable("coude")
         enable("interpreter")
@@ -492,8 +506,8 @@ server <- function(input, output, session) {
       predictions <- model()$predict(data_illustratives())
 
       output$resultats_prediction <- renderPrint({
-        cat("=== Résultats de la prédiction ===\n\n")
-        print(predictions)
+        cat("=== Results of the  predict ===\n\n")
+        summary <-model()$summary()
       })
 
       showNotification("Prédiction effectuée avec succès!", type = "message")
