@@ -502,12 +502,26 @@ server <- function(input, output, session) {
     req(data_illustratives())
 
     tryCatch({
-      # CORRECTION: Passer les données en paramètre
-      predictions <- model()$predict(data_illustratives())
 
       output$resultats_prediction <- renderPrint({
         cat("=== Results of the  predict ===\n\n")
-        summary <-model()$summary()
+
+        if (input$method == "CAH") {
+
+          # On exécute malgré tout predict() pour mettre à jour predict_result
+          invisible(model()$predict(data_illustratives()))
+
+          cat("=== Summary of the CAH model ===\n\n")
+          return(model()$summary())
+        }
+
+        # CORRECTION: Passer les données en paramètre
+        predictions <- model()$predict(data_illustratives())
+        print(predictions)
+
+
+        #Il faut que je fasse un cas pour la CAH qui renvoi
+        #summary <-model()$summary()
       })
 
       showNotification("Prédiction effectuée avec succès!", type = "message")
