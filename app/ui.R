@@ -377,7 +377,7 @@ ui <- navbarPage(
               "method",
               label = tagList(icon("puzzle-piece"), "Méthode"),
               choices = c("K-means" = "kmeans",
-                          "ACM" = "ACM",
+                          "FADM" = "FADM",
                           "CAH" = "CAH")
             ),
             numericInput("k",
@@ -477,23 +477,23 @@ ui <- navbarPage(
                 )
               ),
 
-              # ACM
+              # FADM
               conditionalPanel(
-                condition = "input.method == 'ACM'",
+                condition = "input.method == 'FADM'",
                 div(class = "card",
-                    plotOutput("dendrogramme_acm", height = "500px")
+                    plotOutput("dendrogramme_FADM", height = "500px")
                 ),
                 br(),
                 div(class = "card",
-                    plotOutput("pca_acm", height = "500px")
+                    plotOutput("pca_FADM", height = "500px")
                 ),
                 br(),
                 div(class = "card",
-                    plotOutput("mds_acm", height = "500px")
+                    plotOutput("mds_FADM", height = "500px")
                 ),
                 br(),
                 div(class = "card",
-                    plotOutput("silhouette_acm", height = "500px")
+                    plotOutput("silhouette_FADM", height = "500px")
                 )
               )
             ),

@@ -28,8 +28,8 @@ Suggests:
 Config/testthat/edition: 3
 Collate: 
     'ACM.R'
-    'ACM_Clustering_quali_tierce.R'
     'CAH.R'
+    'FAMD.R'
     'mon_kmeans.R'
     'clusterVariable.R'
 Depends: 

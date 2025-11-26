@@ -19,7 +19,7 @@ server <- function(input, output, session) {
   data_actives <- reactiveVal(NULL)
   data_illustratives <- reactiveVal(NULL)
   model <- reactiveVal(NULL)
-  model_reactif <- reactiveVal(NULL)  # AJOUT: Variable manquante pour ACM
+  model_reactif <- reactiveVal(NULL)  # AJOUT: Variable manquante pour FADM
 
   # ===== 1. IMPORTATION =====
 
@@ -254,7 +254,7 @@ server <- function(input, output, session) {
     k_val <- as.integer(input$k)
 
     # Validation
-    if (input$method %in% c("kmeans", "ACM")) {
+    if (input$method %in% c("kmeans", "FADM")) {
       if (is.na(k_val) || k_val < 2) {
         showNotification("Le nombre de clusters doit être ≥ 2",
                          type = "error")
@@ -262,12 +262,12 @@ server <- function(input, output, session) {
       }
 
 
-    if (k_val >= nrow(df)) {
-      showNotification("Le nombre de clusters doit être < nombre de lignes",
-                       type = "error")
-      return()
+      if (k_val >= nrow(df)) {
+        showNotification("Le nombre de clusters doit être < nombre de lignes",
+                         type = "error")
+        return()
+      }
     }
-  }
 
     tryCatch({
       if (input$method == "kmeans") {
@@ -324,9 +324,9 @@ server <- function(input, output, session) {
 
         showNotification("Clustering CAH terminé!", type = "message")
 
-      } else if (input$method == "ACM") {
+      } else if (input$method == "FADM") {
         if (!any(sapply(df, function(x) is.factor(x) || is.character(x)))) {
-          showNotification("ACM nécessite au moins une variable catégorielle.",
+          showNotification("FADM nécessite au moins une variable catégorielle.",
                            type = "warning")
           return()
         }
@@ -352,7 +352,7 @@ server <- function(input, output, session) {
           mod$summary()
         })
 
-        showNotification("Clustering ACM terminé!", type = "message")
+        showNotification("Clustering FADM terminé!", type = "message")
       }
 
     }, error = function(e) {
@@ -372,7 +372,7 @@ server <- function(input, output, session) {
       } else if (input$method == "CAH") {
         req(model())
         model()$plot("elbow")
-      } else if (input$method == "ACM") {
+      } else if (input$method == "FADM") {
         req(model_reactif())
         mod <- model_reactif()
 
@@ -380,7 +380,7 @@ server <- function(input, output, session) {
         if (!is.null(mod$elbow_method)) {
           return(mod$elbow_method())
         } else {
-          showNotification("La méthode du coude n'est pas disponible pour l'ACM.", type = "warning")
+          showNotification("La méthode du coude n'est pas disponible pour l'FADM.", type = "warning")
           return(NULL)
         }
       }
@@ -423,7 +423,7 @@ server <- function(input, output, session) {
       model()$cluster_quality_report()
     } else if (input$method == "CAH") {
       model()$summary()
-    } else if (input$method == "ACM") {
+    } else if (input$method == "FADM") {
       req(model_reactif())
       mod <- model_reactif()
       mod$qualite_clustering()
@@ -468,10 +468,10 @@ server <- function(input, output, session) {
     model()$plot("silhouette")
   })
 
-  # Visualisations ACM
-  output$dendrogramme_acm <- renderPlot({
+  # Visualisations FADM
+  output$dendrogramme_FADM <- renderPlot({
     req(model_reactif())
-    req(input$method == "ACM")
+    req(input$method == "FADM")
     mod <- model_reactif()
 
     # CORRECTION: Utiliser la bonne méthode selon votre package
@@ -482,9 +482,9 @@ server <- function(input, output, session) {
     }
   })
 
-  output$pca_acm <- renderPlot({
+  output$pca_FADM <- renderPlot({
     req(model_reactif())
-    req(input$method == "ACM")
+    req(input$method == "FADM")
     mod <- model_reactif()
 
     # CORRECTION: Utiliser la bonne méthode selon votre package

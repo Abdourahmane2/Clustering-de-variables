@@ -11,6 +11,76 @@ library(dplyr)
 library(R6)
 library(ggrepel)
 
+#' CAH_mixtes: Clustering Hiérarchique de Variables sur Données Mixtes
+#'
+#' @description
+#' Classe R6 pour effectuer une analyse factorielle de données mixtes (FAMD)
+#' suivie d'un clustering hiérarchique des variables. Cette classe permet de
+#' regrouper des variables quantitatives et qualitatives en clusters homogènes
+#' en se basant sur leurs coordonnées dans l'espace factoriel.
+#'
+#' @details
+#' La classe CAH_mixtes combine deux analyses principales :
+#' \itemize{
+#'   \item \strong{FAMD (Factor Analysis of Mixed Data)} : Analyse factorielle
+#'         adaptée aux données contenant à la fois des variables quantitatives
+#'         et qualitatives
+#'   \item \strong{Clustering hiérarchique} : Regroupement des variables en
+#'         clusters basé sur leurs coordonnées factorielles
+#' }
+#'
+#' Le processus complet suit ces étapes :
+#' \enumerate{
+#'   \item Détection automatique des types de variables (quantitatives/qualitatives)
+#'   \item Calcul de la FAMD pour obtenir les coordonnées factorielles des variables
+#'   \item Clustering hiérarchique des variables dans l'espace factoriel
+#'   \item Visualisation et évaluation de la qualité du clustering
+#' }
+#'
+#' @field n_components Nombre de composantes principales à conserver (entier)
+#' @field famd_result Résultat complet de l'analyse FAMD (objet FactoMineR)
+#' @field data Données d'entraînement (data.frame)
+#' @field data_type Type de données détecté : "mixte", "quali" ou "quanti"
+#' @field quanti_vars Vecteur des noms des variables quantitatives
+#' @field quali_vars Vecteur des noms des variables qualitatives
+#' @field coord_var Matrice des coordonnées des variables dans l'espace factoriel
+#' @field eigenvalues Valeurs propres de la FAMD
+#' @field inertia_explained Pourcentage d'inertie expliquée par composante
+#' @field labels_var Vecteur des labels de clusters pour chaque variable
+#' @field hclust_result Résultat du clustering hiérarchique (objet hclust)
+#' @field cluster_centers Matrice des centres de clusters
+#' @field clustering_method Méthode de clustering utilisée
+#' @field n_clusters Nombre de clusters créés
+#'
+#' @examples
+#' \dontrun{
+#' # Créer un objet CAH_mixtes avec 5 composantes
+#' model <- CAH_mixtes$new(n_components = 5)
+#'
+#' # Charger des données mixtes
+#' data <- data.frame(
+#'   age = c(25, 30, 35, 40, 45),
+#'   revenu = c(30000, 45000, 60000, 75000, 90000),
+#'   categorie = factor(c("A", "B", "A", "C", "B")),
+#'   niveau = factor(c("bas", "moyen", "haut", "haut", "moyen"))
+#' )
+#'
+#' # Effectuer l'analyse FAMD
+#' model$fit(data)
+#'
+#' # Effectuer le clustering hiérarchique
+#' model$clustering_hierarchical(n_clusters = 2, method = "ward")
+#'
+#' # Visualiser les résultats
+#' model$plot_variables(axes = c(1, 2))
+#' model$dendo()
+#' model$qualite_clustering()
+#'
+#' # Afficher le résumé
+#' model$summary()
+#' }
+#'
+#' @export
 CAH_mixtes <- R6Class("CAH_mixtes",
                       public = list(
                         # Attributes
@@ -29,7 +99,23 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                         clustering_method = NULL,
                         n_clusters = NULL,
 
-                        # Constructor
+                        #' @description
+                        #' Initialise un nouvel objet CAH_mixtes
+                        #'
+                        #' @param n_components Nombre de composantes principales à conserver pour la FAMD.
+                        #'   Par défaut : 5. Ce paramètre détermine la dimensionnalité de l'espace
+                        #'   factoriel dans lequel le clustering sera effectué.
+                        #'
+                        #' @return Un nouvel objet CAH_mixtes initialisé
+                        #'
+                        #' @examples
+                        #' \dontrun{
+                        #' # Créer un modèle avec 5 composantes (par défaut)
+                        #' model <- CAH_mixtes$new()
+                        #'
+                        #' # Créer un modèle avec 10 composantes
+                        #' model <- CAH_mixtes$new(n_components = 10)
+                        #' }
                         initialize = function(n_components = 5) {
                           self$n_components <- n_components
                           cat("═══════════════════════════════════════════════════\n")
@@ -39,7 +125,31 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           cat(sprintf("Nombre de composantes : %d\n", n_components))
                         },
 
-                        # Method to perform FAMD
+                        #' @description
+                        #' Effectue l'analyse FAMD sur les données fournies
+                        #'
+                        #' @param df Data.frame contenant les données à analyser. Peut contenir
+                        #'   des variables quantitatives (numériques) et/ou qualitatives (facteurs
+                        #'   ou chaînes de caractères). La détection du type de variables est
+                        #'   automatique.
+                        #'
+                        #' @details
+                        #' Cette méthode :
+                        #' \itemize{
+                        #'   \item Détecte automatiquement les types de variables
+                        #'   \item Convertit les variables qualitatives en facteurs
+                        #'   \item Calcule la FAMD avec le nombre de composantes spécifié
+                        #'   \item Extrait les coordonnées des variables dans l'espace factoriel
+                        #'   \item Pour les variables qualitatives, calcule le barycentre des modalités
+                        #' }
+                        #'
+                        #' @return L'objet CAH_mixtes mis à jour (invisible), permettant le chaînage
+                        #'
+                        #' @examples
+                        #' \dontrun{
+                        #' model <- CAH_mixtes$new(n_components = 5)
+                        #' model$fit(my_data)
+                        #' }
                         fit = function(df) {
                           cat("\n========================================\n")
                           cat("ÉTAPE 1 : ANALYSE DES DONNÉES\n")
@@ -139,7 +249,42 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           invisible(self)
                         },
 
-                        # Hierarchical Clustering on VARIABLES
+                        #' @description
+                        #' Effectue un clustering hiérarchique des variables
+                        #'
+                        #' @param n_clusters Nombre de clusters à créer (entier positif)
+                        #' @param method Méthode de liaison pour la CAH. Options disponibles :
+                        #'   \itemize{
+                        #'     \item \code{"ward"} (par défaut) : Méthode de Ward (ward.D2)
+                        #'     \item \code{"complete"} : Liaison complète
+                        #'     \item \code{"single"} : Liaison simple
+                        #'     \item \code{"average"} : Liaison moyenne
+                        #'   }
+                        #'
+                        #' @details
+                        #' Cette méthode :
+                        #' \itemize{
+                        #'   \item Calcule la matrice de distances euclidiennes entre les variables
+                        #'     dans l'espace factoriel
+                        #'   \item Effectue un clustering hiérarchique avec la méthode spécifiée
+                        #'   \item Coupe l'arbre hiérarchique pour obtenir le nombre de clusters souhaité
+                        #'   \item Calcule les centres de chaque cluster
+                        #'   \item Affiche la distribution des variables par cluster
+                        #' }
+                        #'
+                        #' @return Vecteur nommé des labels de clusters pour chaque variable
+                        #'
+                        #' @examples
+                        #' \dontrun{
+                        #' model <- CAH_mixtes$new()
+                        #' model$fit(my_data)
+                        #'
+                        #' # Clustering avec méthode de Ward (par défaut)
+                        #' labels <- model$clustering_hierarchical(n_clusters = 3)
+                        #'
+                        #' # Clustering avec liaison complète
+                        #' labels <- model$clustering_hierarchical(n_clusters = 3, method = "complete")
+                        #' }
                         clustering_hierarchical = function(n_clusters, method = "ward") {
                           if (is.null(self$coord_var)) {
                             stop("Erreur : Vous devez d'abord exécuter fit() !")
@@ -201,6 +346,44 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           return(self$labels_var)
                         },
 
+                        #' @description
+                        #' Prédit le cluster d'appartenance pour de nouvelles variables
+                        #'
+                        #' @param new_vars Data.frame contenant les nouvelles variables à classer.
+                        #'   Doit avoir le même nombre de lignes (individus) que les données
+                        #'   d'entraînement.
+                        #'
+                        #' @details
+                        #' Cette méthode :
+                        #' \itemize{
+                        #'   \item Combine les données d'entraînement avec les nouvelles variables
+                        #'   \item Effectue une nouvelle FAMD sur l'ensemble combiné
+                        #'   \item Extrait les coordonnées des nouvelles variables
+                        #'   \item Calcule la distance aux centres de clusters existants
+                        #'   \item Assigne chaque nouvelle variable au cluster le plus proche
+                        #' }
+                        #'
+                        #' @return Data.frame avec trois colonnes :
+                        #'   \itemize{
+                        #'     \item \code{Variable} : Nom de la variable
+                        #'     \item \code{Type} : Type de la variable ("Quantitative" ou "Qualitative")
+                        #'     \item \code{Cluster_Predit} : Numéro du cluster prédit
+                        #'   }
+                        #'
+                        #' @examples
+                        #' \dontrun{
+                        #' model <- CAH_mixtes$new()
+                        #' model$fit(train_data)
+                        #' model$clustering_hierarchical(n_clusters = 3)
+                        #'
+                        #' # Prédire pour de nouvelles variables
+                        #' new_vars <- data.frame(
+                        #'   nouvelle_var1 = c(1, 2, 3, 4, 5),
+                        #'   nouvelle_var2 = factor(c("A", "B", "A", "C", "B"))
+                        #' )
+                        #' predictions <- model$predict(new_vars)
+                        #' print(predictions)
+                        #' }
                         predict = function(new_vars) {
                           if (is.null(self$cluster_centers)) {
                             stop("Erreur : Vous devez d'abord exécuter clustering_hierarchical() !")
@@ -297,46 +480,30 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                             stringsAsFactors = FALSE
                           )
 
-                          # Ajouter les distances aux centres
-                          for (k in 1:self$n_clusters) {
-                            distances_k <- apply(coord_new_vars, 1, function(var_coord) {
-                              sqrt(sum((var_coord - self$cluster_centers[k, ])^2))
-                            })
-                            results[[paste0("Distance_Cluster_", k)]] <- round(distances_k, 3)
-                          }
-
                           cat("═══════════════════════════════════════\n")
                           cat("RÉSULTATS DE PRÉDICTION\n")
                           cat("═══════════════════════════════════════\n\n")
 
-                          for (i in 1:nrow(results)) {
-                            cat(sprintf("📌 %s (%s) → Cluster %d\n",
-                                        results$Variable[i],
-                                        results$Type[i],
-                                        results$Cluster_Predit[i]))
-                          }
-                          cat("\n")
-
-                          # Afficher les variables existantes dans chaque cluster pour comparaison
-                          cat("📋 Pour rappel, clusters existants :\n")
-                          for (k in 1:self$n_clusters) {
-                            vars_in_cluster <- names(self$labels_var[self$labels_var == k])
-                            cat(sprintf("\n   Cluster %d (%d variables) :\n", k, length(vars_in_cluster)))
-                            for (v in head(vars_in_cluster, 5)) {
-                              cat(sprintf("     • %s\n", v))
-                            }
-                            if (length(vars_in_cluster) > 5) {
-                              cat(sprintf("     ... et %d autres\n", length(vars_in_cluster) - 5))
-                            }
-                          }
-                          cat("\n")
-
                           return(results)
                         },
 
-
-
-                        # Dendrogramme
+                        #' @description
+                        #' Affiche le dendrogramme du clustering hiérarchique
+                        #'
+                        #' @details
+                        #' Génère un graphique du dendrogramme (arbre hiérarchique) montrant
+                        #' la structure du clustering des variables. L'axe des ordonnées représente
+                        #' la distance à laquelle les clusters sont fusionnés.
+                        #'
+                        #' @return L'objet CAH_mixtes (invisible), permettant le chaînage
+                        #'
+                        #' @examples
+                        #' \dontrun{
+                        #' model <- CAH_mixtes$new()
+                        #' model$fit(my_data)
+                        #' model$clustering_hierarchical(n_clusters = 3)
+                        #' model$dendo()
+                        #' }
                         dendo = function() {
                           if (is.null(self$hclust_result)) {
                             stop("Erreur : Vous devez d'abord exécuter clustering_hierarchical() !")
@@ -356,9 +523,36 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           invisible(self)
                         },
 
-
-
-                        # Visualize VARIABLES in factorial plane
+                        #' @description
+                        #' Visualise les variables dans le plan factoriel
+                        #'
+                        #' @param axes Vecteur de deux entiers spécifiant les axes à afficher.
+                        #'   Par défaut : c(1, 2) pour les deux premières dimensions.
+                        #'
+                        #' @details
+                        #' Génère un graphique ggplot2 montrant :
+                        #' \itemize{
+                        #'   \item La position des variables dans le plan factoriel
+                        #'   \item Le type de chaque variable (forme du point)
+                        #'   \item Le cluster d'appartenance (couleur du point) si le clustering
+                        #'         a été effectué
+                        #'   \item Le nom de chaque variable (avec évitement de chevauchement)
+                        #' }
+                        #'
+                        #' @return L'objet CAH_mixtes (invisible), permettant le chaînage
+                        #'
+                        #' @examples
+                        #' \dontrun{
+                        #' model <- CAH_mixtes$new()
+                        #' model$fit(my_data)
+                        #' model$clustering_hierarchical(n_clusters = 3)
+                        #'
+                        #' # Visualiser dans le plan (Dim1, Dim2)
+                        #' model$plot_variables(axes = c(1, 2))
+                        #'
+                        #' # Visualiser dans le plan (Dim2, Dim3)
+                        #' model$plot_variables(axes = c(2, 3))
+                        #' }
                         plot_variables = function(axes = c(1, 2)) {
                           if (is.null(self$coord_var)) {
                             stop("Erreur : Vous devez d'abord exécuter fit() !")
@@ -416,7 +610,37 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           invisible(self)
                         },
 
-                        # Elbow method
+                        #' @description
+                        #' Applique la méthode du coude pour déterminer le nombre optimal de clusters
+                        #'
+                        #' @param max_clusters Nombre maximum de clusters à tester. Par défaut : 10
+                        #' @param method Méthode de liaison pour la CAH. Par défaut : "ward"
+                        #'
+                        #' @details
+                        #' Cette méthode :
+                        #' \itemize{
+                        #'   \item Calcule l'inertie intra-cluster pour chaque nombre de clusters
+                        #'     de 2 à max_clusters
+                        #'   \item Génère un graphique de l'évolution de l'inertie
+                        #'   \item Permet d'identifier visuellement le "coude" optimal
+                        #' }
+                        #'
+                        #' Le nombre optimal de clusters correspond généralement au point où
+                        #' l'inertie diminue moins rapidement (le "coude" de la courbe).
+                        #'
+                        #' @return L'objet CAH_mixtes (invisible), permettant le chaînage
+                        #'
+                        #' @examples
+                        #' \dontrun{
+                        #' model <- CAH_mixtes$new()
+                        #' model$fit(my_data)
+                        #'
+                        #' # Tester jusqu'à 10 clusters
+                        #' model$elbow_method(max_clusters = 10)
+                        #'
+                        #' # Tester jusqu'à 15 clusters avec liaison complète
+                        #' model$elbow_method(max_clusters = 15, method = "complete")
+                        #' }
                         elbow_method = function(max_clusters = 10, method = "ward") {
                           if (is.null(self$coord_var)) {
                             stop("Erreur : Vous devez d'abord exécuter fit() !")
@@ -479,6 +703,34 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           invisible(self)
                         },
 
+                        #' @description
+                        #' Évalue la qualité du clustering à l'aide de la silhouette
+                        #'
+                        #' @details
+                        #' Cette méthode :
+                        #' \itemize{
+                        #'   \item Calcule le coefficient de silhouette pour chaque variable
+                        #'   \item Calcule la largeur moyenne de silhouette (qualité globale)
+                        #'   \item Génère un graphique de silhouette coloré par cluster
+                        #' }
+                        #'
+                        #' Interprétation de la silhouette :
+                        #' \itemize{
+                        #'   \item 0.71 - 1.0 : Structure forte
+                        #'   \item 0.51 - 0.70 : Structure raisonnable
+                        #'   \item 0.26 - 0.50 : Structure faible
+                        #'   \item < 0.25 : Pas de structure substantielle
+                        #' }
+                        #'
+                        #' @return L'objet CAH_mixtes (invisible), permettant le chaînage
+                        #'
+                        #' @examples
+                        #' \dontrun{
+                        #' model <- CAH_mixtes$new()
+                        #' model$fit(my_data)
+                        #' model$clustering_hierarchical(n_clusters = 3)
+                        #' model$qualite_clustering()
+                        #' }
                         qualite_clustering = function() {
                           if (is.null(self$labels_var)) {
                             stop("Erreur : Vous devez d'abord exécuter clustering_hierarchical() !")
@@ -501,7 +753,29 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           invisible(self)
                         },
 
-                        # PRINT method
+                        #' @description
+                        #' Affiche un résumé des résultats de l'analyse
+                        #'
+                        #' @details
+                        #' Affiche des informations sur :
+                        #' \itemize{
+                        #'   \item Le nombre d'individus et de variables
+                        #'   \item Le type de données (mixte, qualitatives, quantitatives)
+                        #'   \item Le nombre de composantes et l'inertie expliquée
+                        #'   \item Le nombre de clusters créés
+                        #'   \item La distribution des variables par cluster
+                        #'   \item Les objets R accessibles
+                        #' }
+                        #'
+                        #' @return L'objet CAH_mixtes (invisible), permettant le chaînage
+                        #'
+                        #' @examples
+                        #' \dontrun{
+                        #' model <- CAH_mixtes$new()
+                        #' model$fit(my_data)
+                        #' model$clustering_hierarchical(n_clusters = 3)
+                        #' model$print()
+                        #' }
                         print = function() {
                           cat("\n═══════════════════════════════════════════════════\n")
                           cat("  RÉSULTATS FAMD + CLUSTERING DE VARIABLES\n")
@@ -547,7 +821,29 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           invisible(self)
                         },
 
-                        # Summary of variable clusters
+                        #' @description
+                        #' Affiche un résumé détaillé des clusters de variables
+                        #'
+                        #' @details
+                        #' Pour chaque cluster, affiche :
+                        #' \itemize{
+                        #'   \item Le numéro du cluster et le nombre de variables
+                        #'   \item La liste des variables quantitatives
+                        #'   \item La liste des variables qualitatives
+                        #' }
+                        #'
+                        #' Cette méthode aide à interpréter le sens de chaque cluster en
+                        #' identifiant les variables regroupées ensemble.
+                        #'
+                        #' @return L'objet CAH_mixtes (invisible), permettant le chaînage
+                        #'
+                        #' @examples
+                        #' \dontrun{
+                        #' model <- CAH_mixtes$new()
+                        #' model$fit(my_data)
+                        #' model$clustering_hierarchical(n_clusters = 3)
+                        #' model$summary()
+                        #' }
                         summary = function() {
                           if (is.null(self$labels_var)) {
                             cat("❌ Aucun clustering n'a été effectué.\n")
@@ -583,8 +879,6 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                                 cat(sprintf("     • %s\n", var))
                               }
                             }
-
-
                           }
 
                           cat("═══════════════════════════════════════════════════\n\n")
@@ -593,6 +887,3 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                         }
                       )
 )
-
-
-
