@@ -464,6 +464,12 @@ CAH <- R6Class(
     #' @field k_current Integer, current k used for cutree
     k_current = NULL,
 
+    r2_info = NULL,
+
+    silhouette = NULL,
+
+    eta2 = NULL,
+
 
     # ===== CONSTRUCTOR =====
 #' @description
@@ -637,6 +643,9 @@ cutree = function(k=NULL) {
       )
     }
   }
+  self$r2_info <- private$compute_r_squared()
+  self$silhouette <- private$compute_silhouette()
+  self$eta2 <- private$compute_eta_squared()
 
   message("[CAH] Partitioning completed: ", k, " clusters and calculated latent components. ")
   return(cl)
@@ -886,11 +895,14 @@ summary = function(...) {
   # ===== SECTION 3 : QUALITY METRICS =====
   cat("\n3. QUALITY METRICS\n")
   cat("_____________________________\n")
-  r2_info <- private$compute_r_squared()
+
+  r2_info <- self$r2_info
+  sil <- self$silhouette
+  eta2 <- self$eta2
+
   cat(sprintf("R² = %.4f (%.2f%%)\n", r2_info$r_squared, r2_info$percentage))
   cat(sprintf("  → Interpretation: Grouping explains %.2f%% of variance\n", r2_info$percentage))
 
-  sil <- private$compute_silhouette()
   cat(sprintf("\nMean Silhouette = %.4f\n", sil$mean_score))
   cat(sprintf("  → %s\n",
               if (sil$mean_score > 0.6) "✓✓ Excellent (>0.6)"
@@ -900,7 +912,7 @@ summary = function(...) {
   # ===== SECTION 4 : VARIABLE QUALITY =====
   cat("\n4. VARIABLE QUALITY (η²)\n")
   cat("__________________________\n")
-  eta2 <- private$compute_eta_squared()
+
   if (length(eta2) > 0) {
     cat("Top variables by discriminant power:\n")
     for (i in 1:min(5, length(eta2))) {
