@@ -30,7 +30,13 @@
 ### Algorithms
 
 1. **Hierarchical Ascending Classification (HAC)**
--  here the milena methods 
+  - Custom correlation-based distance matrix for variable similarity
+  - Automatic preprocessing (numeric selection, constant-variable removal, NA handling)
+  - Optimal k detection using dendrogram jumps
+  - BSS/WSS ratio and gap statistic
+  - Silhouette evaluation for partition quality
+  - Local PCA components to compute latent factors within each cluster
+  - Prediction module assigning new variables to clusters via latent-component correlations
      
 2. **K-means**
    - Custom implementation for variable clustering
@@ -123,9 +129,11 @@ model$summary()
 model$plot_clusters()
 model$plot_elbow(k_max = 10)
 ```
+Example 3 : AFDM
+Marvin's part
+```r
 
-
-
+```
 ---
 
 ## 🖥️ Shiny Application
@@ -158,7 +166,16 @@ shiny::runApp()
 
 #### CAH class
 
-here are Milena's methods
+| Method                    | Description                                              |
+| ------------------------- | -------------------------------------------------------- |
+| `new(method = "ward.D2")` | CAH initialization                                       |
+| `fit(data)`               | Preprocessing, distance matrix, hierarchical clustering  |
+| `cutree(k)`               | Generates clusters and latent components                 |
+| `predict(X_new)`          | Assigns new variables to clusters                        |
+| `summary()`               | Detailed clustering summary                              |
+| `print()`                 | Compact model overview                                   |
+| `plot(type)`              | Visualizations (dendrogram, PCA, MDS, silhouette, elbow) |
+
 
 #### clusterVariable(Kmeans) class
 
@@ -237,6 +254,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
