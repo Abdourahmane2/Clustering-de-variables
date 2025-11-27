@@ -230,7 +230,7 @@ ClusterVariable/
 │   ├── CAH.R                    # CAH (R6 class)
 │   ├── clusterVariable.R        # K-means (R6 class)
 │   ├── mon_kmeans.R             # K-means implementation
-│   ├── ACM.R                    # Wrapper ACM (R6 class)
+│   ├── ACM.R                    # Wrapper AFDM (R6 class)
 │   └── ACM_Clustering_quali_tierce.R  # Mixed data (class R6)
 ├── man/                         # Documentation
 │   ├── CAH.Rd
@@ -254,6 +254,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
