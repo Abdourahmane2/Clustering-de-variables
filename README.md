@@ -32,8 +32,8 @@
 1. **Hierarchical Ascending Classification (HAC)**
     - Custom correlation-based distance matrix for variable similarity
     - Automatic preprocessing (numeric selection, constant-variable removal, NA handling)
-    - Optimal k detection using dendrogram jumps
-    - BSS/WSS ratio and gap statistic
+    - Optimal k detection using dendrogram jump
+    - Elbow method for selecting optimal k
     - Silhouette evaluation for partition quality
     - Local PCA components to compute latent factors within each cluster
     - Prediction module assigning new variables to clusters via latent-component correlations
@@ -254,6 +254,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
