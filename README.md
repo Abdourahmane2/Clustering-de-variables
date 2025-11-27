@@ -189,7 +189,7 @@ shiny::runApp()
 | `plot_elbow()` | Elbow method |
 | `cluster_quality_report()` | Detailed quality report |
 
-#### Classe CAH_mixtes
+#### CAH_mixtes (AFDM) class
 | Method | Description |
 |---------|-------------|
 | `new(n_components)` | AFDM initialization |
@@ -222,7 +222,7 @@ model$cluster_result  # Clustering results
 
 ---
 
-##  Structure du package
+## Package structure
 
 ```
 ClusterVariable/
@@ -254,6 +254,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
