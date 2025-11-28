@@ -18,6 +18,8 @@
 #'   \item Automatic optimal k detection using elbow method
 #'   \item PCA-based latent components for each cluster
 #'   \item Prediction of new variable assignments
+#'   \item Quality metrics (R², Silhouette, n²)
+#'   \item Multiple visualization types
 #' }
 #'
 #' The algorithm groups variables that are highly correlated, allowing for
@@ -72,6 +74,7 @@
 #'     For each cluster, a latent component is created using PCA on the
 #'     standardized variables within that cluster. The latent component
 #'     represents the first principal axis and captures the maximum variance.
+#'     Also computes quality metrics : R², Silhouette scores, and n² (eta-squared)
 #'   }
 #'
 #'   \item{\code{predict(X_new)}}{
@@ -86,7 +89,8 @@
 #'  \strong{Returns:} Self (invisibly)
 #'     New variables are standardized and assigned to the cluster whose latent
 #'     component has the highest absolute correlation. The assignment is stored
-#'     in the \code{predict_result} field.
+#'     in the \code{predict_result} field. These are supplementary variables,
+#'     which means they did not participate in cluster formation.
 #'   }
 #'
 #'   \item{\code{print(...)}}{
@@ -98,6 +102,8 @@
 #'       \item Optimal k
 #'       \item Cluster sizes
 #'       \item Number of supplementary variables
+#'       \item BSS ratio and GAP statistics for cluster quality
+#'       \item Variable membership
 #'     }
 #'   }
 #'
@@ -113,7 +119,23 @@
 #'       \item Complete partition (active + supplementary variables)
 #'     }
 #'   }
-#' }
+#'   \item{\code{plot(type = "dendrogramme")}}{
+#'     Create visualizations of the CAH results.
+#'
+#'     \strong{Parameters:}
+#'    \itemize{
+#'     \item \code{type}: Type of plot to generate. Options are:
+#'       \itemize{
+#'         \item \code{"dendrogramme"}: Hierarchical clustering dendrogram with
+#'               cluster rectangles (default)
+#'         \item \code{"acp"}: PCA biplot showing variable correlations
+#'         \item \code{"mds"}: Multidimensional scaling projection
+#'         \item \code{"silhouette"}: Silhouette plot for cluster quality
+#'         \item \code{"elbow"}: Elbow method plot for optimal k detection
+#'       }
+#'     }
+#'  }
+#'}
 #'
 #' @section Mathematical Details:
 #'
@@ -139,14 +161,16 @@
 #'
 #' \strong{Optimal k detection:}
 #'
-#' The optimal number of clusters is detected using the elbow method on the
-#' dendrogram heights. The algorithm identifies the point of maximum curvature
-#' by computing the second derivative of the height sequence:
+#' The optimal number of clusters is detected using a variation of the elbow
+#' method applied to the dendrogram heights. Instead of computing curvature,
+#' the algorithm identifies the largest jump between consecutive merge heights.
 #'
-#' \deqn{k_{opt} = \arg\min_{i} \Delta^2 h_i}
+#' \deqn{k_{opt} = \arg\max_{i} \Delta h_i + 1}
 #'
-#' where \eqn{\Delta^2 h_i = (h_{i+1} - h_i) - (h_i - h_{i-1})} is the
-#' discrete second derivative.
+#' where \eqn{\Delta h_i = h_{i+1} - h_i} represents the discrete first-order
+#' difference between successive heights. A large value of \eqn{\Delta h_i}
+#' indicates a natural separation between clusters. The optimal number of
+#' clusters is thus selected just before the largest increase in height.
 #'
 #' \strong{Latent component:}
 #'
@@ -167,6 +191,38 @@
 #'
 #' where \eqn{X_{new}^*} is the standardized new variable and \eqn{r} denotes
 #' the Pearson correlation coefficient.
+#'
+#' \strong{Quality Metrics:}
+#'
+#' \enumerate{
+#'   \item \strong{R² (Coefficient of Determination):} Measures the proportion
+#'         of variance explained by the clustering. Computed as the mean of η²
+#'         values across all variables. Ranges from 0 to 1; higher values indicate
+#'         better cluster cohesion.
+#'
+#'   \item \strong{Silhouette Score:} Measures how similar a variable is to its own
+#'         cluster compared to other clusters. For variable i in cluster C:
+#'
+#'         \deqn{s(i) = \frac{b(i) - a(i)}{\max(a(i), b(i))}}
+#'
+#'         where a(i) is mean distance to variables in same cluster and
+#'         b(i) is minimum mean distance to variables in other clusters.
+#'         Ranges from -1 to 1; values > 0.6 indicate excellent clustering.
+#'
+#'   \item \strong{η² (Eta-squared):} Represents the squared correlation between
+#'         a variable and its cluster's latent component. Indicates how well
+#'         a variable is represented by the cluster. Ranges from 0 to 1.
+#' }
+#'
+#' \strong{Cluster Quality Indices:}
+#'
+#' \enumerate{
+#'   \item \strong{BSS Ratio:} Between-cluster sum of squares divided by total
+#'         sum of squares. Higher values indicate more distinct clusters.
+#'
+#'   \item \strong{GAP statistic:} Measures the jump in BSS ratio at each k.
+#'         The optimal k typically corresponds to the largest GAP value.
+#' }
 #'
 #' @section Public Fields:
 #' \describe{
@@ -196,6 +252,21 @@
 #'       \item \code{scaled_data}: Matrix of standardized data for variables in the cluster
 #'     }
 #'   }
+#' \item{\code{r2_info}}{List containing R² information:
+#'     \itemize{
+#'       \item \code{r_squared}: Numeric, mean η² across all variables
+#'       \item \code{percentage}: Numeric, R² expressed as percentage
+#'     }
+#'   }
+#'   \item{\code{silhouette}}{List containing silhouette analysis results:
+#'     \itemize{
+#'       \item \code{scores}: Numeric vector of silhouette scores per variable
+#'       \item \code{mean_score}: Numeric, mean silhouette score for all variables
+#'     }
+#'   }
+#'   \item{\code{eta2}}{Named numeric vector of η² values for each variable,
+#'         sorted in descending order. Represents squared correlation with latent
+#'         component. Higher values indicate variables better represented by their cluster}
 #' }
 #'
 #' @note
@@ -210,6 +281,8 @@
 #'   \item For large datasets (>1000 variables), consider using a subset or
 #'         pre-filtering correlated variables
 #'   \item The number of clusters k must be between 1 and (number of variables - 1)
+#'   \item Supplementary variables (from predict()) do not affect the clustering
+#'         structure; they are only assigned to existing clusters for illustration
 #' }
 #'
 #' \strong{Interpretation guidelines:}
@@ -225,6 +298,9 @@
 #'         represented by the latent component (values close to 1 are better)
 #'   \item The average correlation (\code{corr_moy}) gives an overall measure of
 #'         redundancy in the dataset
+#'   \item R² > 0.70 indicates good clustering; R² > 0.50 is acceptable
+#'   \item Mean Silhouette > 0.6 indicates excellent structure; > 0.4 is acceptable
+#'   \item η² > 0.8 for a variable indicates excellent representation in its cluster
 #' }
 #'
 #' \strong{Computational complexity:}
@@ -287,14 +363,26 @@
 #' print(cah$predict_result)
 #'
 #' # ═══════════════════════════════════════════════════════════
-#' # Example 3: Method chaining
+#' # Example 3: Quality metrics interpretation
+#' # ═══════════════════════════════════════════════════════════
+#'
+#' # After calling cutree(), access quality metrics:
+#' cat("R² =", round(cah$r2_info$r_squared, 4), "\n")
+#' cat("Mean Silhouette =", round(cah$silhouette$mean_score, 4), "\n")
+#'
+#' # View η² for each variable (quality of representation)
+#' print(cah$eta2)
+#'
+#'
+#' # ═══════════════════════════════════════════════════════════
+#' # Example 4: Method chaining
 #' # ═══════════════════════════════════════════════════════════
 #' \dontrun{
 #' CAH$new()$fit(df)$cutree()$print()
 #' }
 #'
 #' # ═══════════════════════════════════════════════════════════
-#' # Example 4: Working with real data (mtcars)
+#' # Example 5: Working with real data (mtcars)
 #' # ═══════════════════════════════════════════════════════════
 #' \dontrun{
 #' data(mtcars)
@@ -364,31 +452,49 @@
 #' }
 #'
 #' # ═══════════════════════════════════════════════════════════
-#' # Example 6: Accessing internal components
+#' # Example 6: Visualizing clustering results
 #' # ═══════════════════════════════════════════════════════════
 #' \dontrun{
 #' cah <- CAH$new()
 #' cah$fit(df)
 #' cah$cutree(k = 2)
 #'
-#' # Access correlation matrix through distance matrix
-#' dist_mat <- as.matrix(cah$dist_matrix)
+#' # Create all visualization types
+#' cah$plot("dendrogramme")  # Dendrogram with cluster rectangles
+#' cah$plot("acp")           # PCA biplot
+#' cah$plot("mds")           # MDS projection
+#' cah$plot("silhouette")    # Silhouette plot
+#' cah$plot("elbow")         # Elbow method
+#' }
 #'
-#' # Get correlations from distances: r = 1 - (d²/2)
-#' cor_mat <- 1 - (dist_mat^2 / 2)
-#' print(cor_mat)
+#' # ═══════════════════════════════════════════════════════════
+#' # Example 7: Interpretation workflow for Shiny integration
+#' # ═══════════════════════════════════════════════════════════
+#' \dontrun{
+#' # This workflow is ideal for Shiny applications where users
+#' # can select active vs supplementary variables
 #'
-#' # Access dendrogram heights
-#' heights <- cah$hc$height
-#' plot(heights, type = "b", main = "Dendrogram Heights",
-#'      xlab = "Merge step", ylab = "Height")
+#' # Step 1: Fit on active variables
+#' cah <- CAH$new()
+#' active_vars <- df[, c("var1", "var2", "var3")]
+#' cah$fit(active_vars)
 #'
-#' # Second derivative for elbow detection
-#' d1 <- diff(heights)
-#' d2 <- diff(d1)
-#' plot(d2, type = "b", main = "Second Derivative (Elbow Detection)",
-#'      xlab = "Step", ylab = "Curvature")
-#' abline(v = which.min(d2), col = "red", lty = 2)
+#' # Step 2: Choose optimal k
+#' cah$cutree(k = cah$best_k)
+#'
+#' # Step 3: Print summary
+#' cah$summary()
+#'
+#' # Step 4: Add supplementary variables for illustration
+#' supp_vars <- df[, c("var4", "var5")]
+#' cah$predict(supp_vars)
+#'
+#' # Step 5: Final detailed summary with both
+#' cah$summary()
+#'
+#' # Step 6: Visualize
+#' cah$plot("dendrogramme")
+#' cah$plot("silhouette")
 #' }
 #'
 #' @seealso
@@ -399,6 +505,7 @@
 #'   \item \code{\link[stats]{prcomp}} - Principal component analysis
 #'   \item \code{\link[stats]{cor}} - Correlation matrix
 #'   \item \code{\link[stats]{dist}} - Distance matrix computation
+#'   \item \code{\link[stats]{cmdscale}} - Multidimensional scaling
 #' }
 #'
 #' @references
@@ -418,6 +525,9 @@
 #'
 #' Husson, F., Lê, S., & Pagès, J. (2017). \emph{Exploratory Multivariate Analysis by Example Using R}
 #' (2nd ed.). Chapman and Hall/CRC.
+#'
+#' #' Kaufman, L., & Rousseeuw, P. J. (2005). \emph{Finding Groups in Data: An Introduction to
+#' Cluster Analysis}. John Wiley & Sons.
 #
 #' @export
 #' @import R6
@@ -464,10 +574,13 @@ CAH <- R6Class(
     #' @field k_current Integer, current k used for cutree
     k_current = NULL,
 
+    #' @field r2_info List containing R² metrics for each cluster and global R².
     r2_info = NULL,
 
+    #' @field silhouette Numeric vector or list containing silhouette values
     silhouette = NULL,
 
+    #' @field eta2 Named numeric vector containing η² (eta-squared) values
     eta2 = NULL,
 
 
@@ -571,8 +684,6 @@ fit = function(data) {
 
   self$best_k <- max(2, min(self$best_k, ncol(self$data) - 1))
   #message("[CAH] The ideal number of classes detected is: k =", self$best_k)
-
-  invisible(self)
 
 },
 
@@ -740,8 +851,6 @@ plot = function(type = "dendrogramme") {
          "silhouette" = private$plot_silhouette(),
          "elbow" = private$plot_elbow()
          )
-
-  invisible(self)
 },
 
 #' @description
@@ -770,7 +879,6 @@ print = function(...) {
 
   if (is.null(self$clusters)) {
     cat("\n Partitioning not performed yet. Call $cutree().\n")
-    return(invisible(self))
   }
 
   # =====================================================
@@ -1012,6 +1120,9 @@ summary = function(...) {
 
 private = list(
 
+  # Compute eta² (η²) values for each variable.
+  # η² measures how well each variable is represented by its cluster's latent component.
+  # Single-variable clusters get η² = 1; others use squared correlations.
   compute_eta_squared = function() {
     eta <- rep(0, length(self$clusters))
     names(eta) <- names(self$clusters)
@@ -1029,6 +1140,9 @@ private = list(
     return(sort(eta, decreasing = TRUE))
   },
 
+  # Compute global R² from η² values.
+  # R² corresponds to the average η² across all variables.
+  # Returns both raw R² and percentage explained variance.
   compute_r_squared = function() {
     eta2 <- private$compute_eta_squared()
     r2 <- mean(eta2)
@@ -1039,6 +1153,9 @@ private = list(
     ))
   },
 
+  # Compute Between-Cluster Sum of Squares (BSS) for the current partition.
+  # Each variable is treated as a point in ℝⁿ (n = individuals).
+  # BSS measures separation between cluster barycenters.
   compute_BSS = function() {
     # Standardisation des variables (colonnes)
     X <- scale(self$data)              # n × p
@@ -1059,6 +1176,8 @@ private = list(
     return(BSS)
   },
 
+  # Compute Within-Cluster Sum of Squares (WSS).
+  # Measures compactness of clusters as distance of variables to their group barycenter.
   compute_WSS = function() {
     X <- scale(self$data)
     clusters <- self$clusters
@@ -1080,6 +1199,8 @@ private = list(
     return(WSS)
   },
 
+  # Compute the ratio BSS / (BSS + WSS).
+  # Higher values indicate better clustering separation.
   compute_BSS_ratio = function() {
     B <- private$compute_BSS()
     W <- private$compute_WSS()
@@ -1089,7 +1210,8 @@ private = list(
     return(B / (B + W))
   },
 
-
+  # Compute the GAP vector from BSS progression across tested k.
+  # GAP[i] = BSS(k_i) - BSS(k_{i-1}), used to detect the optimal k.
   compute_gap = function(BSS_progression) {
     if (length(BSS_progression) < 2)
       return(rep(0, length(BSS_progression)))
@@ -1097,6 +1219,8 @@ private = list(
     return(gap)
   },
 
+  # Compute centroids (barycenters) of all clusters.
+  # Returns a named list of mean vectors, one per cluster.
   compute_centroids = function() {
 
     clusters <- self$clusters
@@ -1116,6 +1240,9 @@ private = list(
     return(centroids)
   },
 
+  # Compute silhouette scores for each variable in the current partition.
+  # Uses the correlation-based distance matrix.
+  # Returns individual scores and the mean silhouette coefficient.
   compute_silhouette = function() {
 
     dist_mat <- as.matrix(self$dist_matrix)
@@ -1152,6 +1279,8 @@ private = list(
     ))
   },
 
+  # Plot the hierarchical clustering dendrogram (private)
+  # Adds cluster rectangles if a partition is available.
   plot_dendrogramme = function() {
     plot(self$hc,
          main = "Hierarchical Clustering Dendrogram",
@@ -1164,7 +1293,8 @@ private = list(
       rect.hclust(self$hc, k = k, border = "red")
     }
   },
-
+  # Plot PCA of variables (private)
+  # Uses first two principal components and colors by current clusters.
   plot_acp = function() {
     acp <- prcomp(self$data, scale. = TRUE, center = TRUE)
     var_explained <- acp$sdev^2 / sum(acp$sdev^2)
@@ -1195,6 +1325,7 @@ private = list(
 
         },
 
+  # Plot MDS projection of variables using the correlation-based distance matrix (private).
   plot_mds = function() {
     mds_coords <- cmdscale(self$dist_matrix, k = 2)
 
@@ -1227,6 +1358,8 @@ private = list(
     abline(h = 0, v = 0, col = "gray", lty = 3)
   },
 
+  # Plot silhouette scores for the current partition (private)
+  # Colors correspond to clusters and mean silhouette is indicated.
   plot_silhouette = function() {
 
     sil <- private$compute_silhouette()
@@ -1250,7 +1383,8 @@ private = list(
     abline(v = 0, col = "gray50")
   },
 
-
+  # Plot elbow curve showing dendrogram heights vs number of clusters (private)
+  # Vertical lines show best_k and current k (if available).
   plot_elbow = function() {
     h <- self$hc$height
     n_clust <- length(h):1
