@@ -522,12 +522,6 @@
 #'
 #' Rakotomalala, R. \emph{Tanagra - Hierarchical Agglomerative Clustering with PCA}.
 #' \url{http://tutoriels-data-mining.blogspot.com/}
-#'
-#' Husson, F., Lê, S., & Pagès, J. (2017). \emph{Exploratory Multivariate Analysis by Example Using R}
-#' (2nd ed.). Chapman and Hall/CRC.
-#'
-#' #' Kaufman, L., & Rousseeuw, P. J. (2005). \emph{Finding Groups in Data: An Introduction to
-#' Cluster Analysis}. John Wiley & Sons.
 #
 #' @export
 #' @import R6
@@ -825,7 +819,6 @@ predict = function(X_new) {
   message("[CAH] Assignment of new variables to existing clusters completed.")
   print(nouv_clusters)
 
-  invisible(self)
 },
 
 #' @description
@@ -962,7 +955,7 @@ print = function(...) {
 
 
 #' @description
-#' Print a detailed summary of the CAH model
+#' Summary a detailed summary of the CAH model
 #' @param ... Additional arguments (ignored)
 #'
 summary = function(...) {
@@ -1112,7 +1105,6 @@ summary = function(...) {
   }
 
   cat("\n____________________________________\n\n")
-  invisible(self)
     }
   ),
 
