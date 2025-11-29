@@ -131,9 +131,31 @@ model$plot_clusters()
 model$plot_elbow(k_max = 10)
 ```
 Example 3 : AFDM
-Marvin's part
-```r
 
+```r
+model <- CAH_mixtes$new(n_components = 5)
+#'
+#' # Load mixed data
+data <- data.frame(
+age = c(25, 30, 35, 40, 45),
+income = c(30000, 45000, 60000, 75000, 90000),
+category = factor(c("A", "B", "A", "C", "B")),
+level = factor(c("low", "medium", "high", "high", "medium"))
+)
+#'
+#' # Perform FAMD analysis
+model$fit(data)
+#'
+#' # Perform hierarchical clustering
+model$clustering_hierarchical(n_clusters = 2, method = "ward")
+#'
+#' # Visualize results
+model$plot_variables(axes = c(1, 2))
+model$dendo()
+model$qualite_clustering()
+#'
+#' # Display summary
+model$summary()
 ```
 ---
 
@@ -255,6 +277,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
