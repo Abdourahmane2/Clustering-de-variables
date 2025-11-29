@@ -67,12 +67,14 @@ if (!requireNamespace(“devtools”, quietly = TRUE)) {
 }
 
 # Install ClusterVariable from GitHub
-devtools::install_github(“Abdourahmane2/ClusterVariable”)
+devtools::install_github(“Abdourahmane2/ClusterVariable”, dependencies = TRUE)
 ```
 
 
 
 ### Dependencies
+
+If needed to install the dependencies manually : 
 
 ```r
 install.packages(c(“R6”, “stats”, ‘FactoMineR’, “factoextra”, 
@@ -253,6 +255,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
