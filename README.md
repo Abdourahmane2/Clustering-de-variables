@@ -177,6 +177,9 @@ shiny::runApp()
 
 ### Application features
 
+📺 **Demo video:**
+https://youtu.be/QLcB4dYoyZ0
+
  Application : https://master2-sise.shinyapps.io/cluster-variables/ 
 
 1. **Data import**: CSV and Excel support, column selection
@@ -305,6 +308,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
