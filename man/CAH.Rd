@@ -522,12 +522,6 @@ Université Lyon 2.
 
 Rakotomalala, R. \emph{Tanagra - Hierarchical Agglomerative Clustering with PCA}.
 \url{http://tutoriels-data-mining.blogspot.com/}
-
-Husson, F., Lê, S., & Pagès, J. (2017). \emph{Exploratory Multivariate Analysis by Example Using R}
-(2nd ed.). Chapman and Hall/CRC.
-
-#' Kaufman, L., & Rousseeuw, P. J. (2005). \emph{Finding Groups in Data: An Introduction to
-Cluster Analysis}. John Wiley & Sons.
 }
 \seealso{
 \strong{Related R functions:}
@@ -701,7 +695,7 @@ Print a summary of the CAH object
 \if{html}{\out{<a id="method-CAH-summary"></a>}}
 \if{latex}{\out{\hypertarget{method-CAH-summary}{}}}
 \subsection{Method \code{summary()}}{
-Print a detailed summary of the CAH model
+Summary a detailed summary of the CAH model
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{CAH$summary(...)}\if{html}{\out{</div>}}
 }

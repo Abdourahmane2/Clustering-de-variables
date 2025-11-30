@@ -99,7 +99,7 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                         cluster_centers = NULL,
                         clustering_method = NULL,
                         n_clusters = NULL,
-                        
+
                         #' @description
                         #' Initialize a new CAH_mixtes object
                         #'
@@ -125,7 +125,7 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           cat("═══════════════════════════════════════════════════\n\n")
                           cat(sprintf("Number of components: %d\n", n_components))
                         },
-                        
+
                         #' @description
                         #' Perform FAMD analysis on provided data
                         #'
@@ -154,17 +154,17 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           cat("\n========================================\n")
                           cat("STEP 1: DATA ANALYSIS\n")
                           cat("========================================\n\n")
-                          
+
                           self$data <- as.data.frame(df)
-                          
+
                           # Detect variable types
                           self$quanti_vars <- names(self$data)[sapply(self$data, is.numeric)]
                           self$quali_vars <- names(self$data)[sapply(self$data, function(x) is.factor(x) || is.character(x))]
-                          
+
                           # Determine data type
                           has_quanti <- length(self$quanti_vars) > 0
                           has_quali <- length(self$quali_vars) > 0
-                          
+
                           if (has_quanti && has_quali) {
                             self$data_type <- "mixte"
                             cat("Detected data type: MIXED\n\n")
@@ -175,38 +175,38 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           } else {
                             stop("No variables detected!")
                           }
-                          
+
                           # Convert qualitative variables to factors
                           for (var in self$quali_vars) {
                             self$data[[var]] <- as.factor(self$data[[var]])
                           }
-                          
+
                           cat("========================================\n")
                           cat("STEP 2: FAMD (Factor Analysis of Mixed Data)\n")
                           cat("========================================\n\n")
-                          
+
                           # Perform FAMD
                           self$famd_result <- FAMD(
                             self$data,
                             ncp = self$n_components,
                             graph = FALSE
                           )
-                          
+
                           # Extract VARIABLE coordinates
                           if (self$data_type %in% c("mixte", "quali")) {
                             # Get coordinates of variables and modalities
                             coord_quali_raw <- self$famd_result$var$coord
                             coord_quali_list <- list()
-                            
+
                             for (var in self$quali_vars) {
                               # Identify rows corresponding to variable modalities
                               modalities <- rownames(coord_quali_raw)[startsWith(rownames(coord_quali_raw), paste0(var, "="))]
-                              
+
                               # Fallback if no result, search for "_" or "."
                               if (length(modalities) == 0) {
                                 modalities <- rownames(coord_quali_raw)[grepl(var, rownames(coord_quali_raw))]
                               }
-                              
+
                               if (length(modalities) > 0) {
                                 # Take barycenter of modalities to have 1 row per variable
                                 coord_quali_list[[var]] <- colMeans(coord_quali_raw[modalities, , drop = FALSE])
@@ -214,10 +214,10 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                                 cat(sprintf("⚠️ No modalities found for %s\n", var))
                               }
                             }
-                            
+
                             # Combine all coordinates
                             coord_quali <- do.call(rbind, coord_quali_list)
-                            
+
                             if (self$data_type == "mixte") {
                               # For quantitative variables
                               coord_quanti <- self$famd_result$quanti.var$coord
@@ -227,27 +227,27 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                               # For quali only
                               self$coord_var <- coord_quali
                             }
-                            
+
                             # Display for verification
                             cat("✅ Variable coordinates prepared for clustering:\n")
                             print(rownames(self$coord_var))
                           } else if (self$data_type == "quanti") {
                             cat("We are only processing quantitative variables\n")
                           }
-                          
+
                           # Extract eigenvalues
                           self$eigenvalues <- self$famd_result$eig[, 1]
                           self$inertia_explained <- self$famd_result$eig[, 2]
-                          
+
                           cat(sprintf("✓ FAMD performed on %d individuals and %d variables\n",
                                       nrow(self$data), nrow(self$coord_var)))
                           cat(sprintf("✓ Inertia explained (cumulative) by %d components: %.2f%%\n\n",
                                       self$n_components,
                                       sum(self$inertia_explained[1:self$n_components])))
-                          
+
                           invisible(self)
                         },
-                        
+
                         #' @description
                         #' Perform hierarchical clustering of variables
                         #'
@@ -288,31 +288,31 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           if (is.null(self$coord_var)) {
                             stop("Error: You must first run fit()!")
                           }
-                          
+
                           cat("\n========================================\n")
                           cat("STEP 3: HIERARCHICAL CLUSTERING OF VARIABLES\n")
                           cat("========================================\n\n")
-                          
+
                           cat("Variables used for clustering:\n")
                           print(rownames(self$coord_var))
-                          
+
                           self$n_clusters <- n_clusters
-                          
+
                           # Calculate distance matrix between VARIABLES
                           dist_matrix <- dist(self$coord_var)
-                          
+
                           # HAC
                           if (method == "ward") {
                             self$hclust_result <- hclust(dist_matrix, method = "ward.D2")
                           } else {
                             self$hclust_result <- hclust(dist_matrix, method = method)
                           }
-                          
+
                           # Cut tree
                           self$labels_var <- cutree(self$hclust_result, k = n_clusters)
                           names(self$labels_var) <- rownames(self$coord_var)
                           self$clustering_method <- "hierarchical"
-                          
+
                           # Calculate cluster centers
                           self$cluster_centers <- matrix(0, nrow = n_clusters, ncol = ncol(self$coord_var))
                           for (i in 1:n_clusters) {
@@ -321,11 +321,11 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           }
                           colnames(self$cluster_centers) <- colnames(self$coord_var)
                           rownames(self$cluster_centers) <- paste0("Cluster_", 1:n_clusters)
-                          
+
                           cat(sprintf("✓ HAC with %d clusters (method: %s)\n\n", n_clusters, method))
                           cat("Distribution of variables by cluster:\n")
                           print(table(self$labels_var))
-                          
+
                           cat("\nVARIABLES BY CLUSTER:\n")
                           cat("═══════════════════════════════════════\n")
                           for (i in 1:n_clusters) {
@@ -341,10 +341,10 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                             }
                           }
                           cat("\n")
-                          
+
                           return(self$labels_var)
                         },
-                        
+
                         #' @description
                         #' Predict cluster membership for new variables
                         #'
@@ -386,31 +386,31 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           if (is.null(self$cluster_centers)) {
                             stop("Error: You must first run clustering_hierarchical()!")
                           }
-                          
+
                           cat("\n========================================\n")
                           cat("CLUSTER PREDICTION FOR NEW VARIABLES\n")
                           cat("========================================\n\n")
-                          
+
                           # new_vars must be a data.frame with NEW VARIABLES as columns
                           # and same individuals as self$data in rows
                           new_vars <- as.data.frame(new_vars)
-                          
+
                           if (nrow(new_vars) != nrow(self$data)) {
                             stop(sprintf("❌ Error: new_vars must have %d rows (same number of individuals)",
                                          nrow(self$data)))
                           }
-                          
+
                           n_new_vars <- ncol(new_vars)
                           cat(sprintf("📊 Number of new variables to predict: %d\n", n_new_vars))
                           cat(sprintf("   Variables: %s\n\n", paste(names(new_vars), collapse = ", ")))
-                          
+
                           # --- 1. Combine old + new variables ---
                           data_combined <- cbind(self$data, new_vars)
-                          
+
                           # --- 2. Detect type of new variables ---
                           new_quanti <- names(new_vars)[sapply(new_vars, is.numeric)]
                           new_quali <- names(new_vars)[sapply(new_vars, function(x) is.factor(x) || is.character(x))]
-                          
+
                           cat("Type of new variables:\n")
                           if (length(new_quanti) > 0) {
                             cat(sprintf("  • Quantitative: %s\n", paste(new_quanti, collapse = ", ")))
@@ -419,39 +419,39 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                             cat(sprintf("  • Qualitative: %s\n", paste(new_quali, collapse = ", ")))
                           }
                           cat("\n")
-                          
+
                           # Convert qualitative to factors
                           for (var in new_quali) {
                             data_combined[[var]] <- as.factor(data_combined[[var]])
                           }
-                          
+
                           # --- 3. FAMD on combined set (old + new variables) ---
                           cat("⏳ Calculating FAMD including new variables...\n")
                           famd_new <- FAMD(data_combined, ncp = self$n_components, graph = FALSE)
-                          
+
                           # --- 4. Extract coordinates of NEW variables only ---
                           coord_new_vars <- matrix(0, nrow = n_new_vars, ncol = self$n_components)
                           rownames(coord_new_vars) <- names(new_vars)
                           colnames(coord_new_vars) <- colnames(self$coord_var)
-                          
+
                           for (i in 1:n_new_vars) {
                             var_name <- names(new_vars)[i]
-                            
+
                             if (var_name %in% new_quanti) {
                               # Quantitative variable
                               coord_new_vars[i, ] <- famd_new$quanti.var$coord[var_name, ]
-                              
+
                             } else if (var_name %in% new_quali) {
                               # Qualitative variable: barycenter of modalities
                               coord_quali_raw <- famd_new$var$coord
                               modalities <- rownames(coord_quali_raw)[startsWith(rownames(coord_quali_raw),
                                                                                  paste0(var_name, "="))]
-                              
+
                               # Fallback
                               if (length(modalities) == 0) {
                                 modalities <- rownames(coord_quali_raw)[grepl(var_name, rownames(coord_quali_raw))]
                               }
-                              
+
                               if (length(modalities) > 0) {
                                 coord_new_vars[i, ] <- colMeans(coord_quali_raw[modalities, , drop = FALSE])
                               } else {
@@ -459,9 +459,9 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                               }
                             }
                           }
-                          
+
                           cat("✓ Coordinates extracted for new variables\n\n")
-                          
+
                           # --- 5. Calculate distance to original cluster centers ---
                           predicted_clusters <- apply(coord_new_vars, 1, function(var_coord) {
                             distances <- apply(self$cluster_centers, 1, function(center) {
@@ -469,7 +469,7 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                             })
                             which.min(distances)
                           })
-                          
+
                           # --- 6. Return results ---
                           results <- data.frame(
                             Variable = names(new_vars),
@@ -477,14 +477,14 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                             Cluster_Predit = predicted_clusters,
                             stringsAsFactors = FALSE
                           )
-                          
+
                           cat("═══════════════════════════════════════\n")
                           cat("PREDICTION RESULTS\n")
                           cat("═══════════════════════════════════════\n\n")
-                          
+
                           return(results)
                         },
-                        
+
                         #' @description
                         #' Display dendrogram of hierarchical clustering
                         #'
@@ -506,21 +506,21 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           if (is.null(self$hclust_result)) {
                             stop("Error: You must first run clustering_hierarchical()!")
                           }
-                          
+
                           cat("\n========================================\n")
                           cat("HIERARCHICAL CLUSTERING DENDROGRAM\n")
                           cat("========================================\n\n")
-                          
+
                           plot(self$hclust_result,
                                main = "Dendrogram of hierarchical clustering of variables",
                                xlab = "Variables",
                                ylab = "Distance",
                                sub = "",
                                cex = 0.8)
-                          
+
                           invisible(self)
                         },
-                        
+
                         #' @description
                         #' Visualize variables in factorial plane
                         #'
@@ -555,28 +555,28 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           if (is.null(self$coord_var)) {
                             stop("Error: You must first run fit()!")
                           }
-                          
+
                           cat("\n========================================\n")
                           cat("VARIABLE PROJECTION\n")
                           cat("========================================\n\n")
-                          
+
                           plot_df <- data.frame(
                             Dim1 = self$coord_var[, axes[1]],
                             Dim2 = self$coord_var[, axes[2]],
                             Variable = rownames(self$coord_var)
                           )
-                          
+
                           # Add variable type
                           plot_df$Type <- ifelse(plot_df$Variable %in% self$quanti_vars,
                                                  "Quantitative", "Qualitative")
-                          
+
                           # Add cluster if available
                           if (!is.null(self$labels_var)) {
                             plot_df$Cluster <- as.factor(self$labels_var[plot_df$Variable])
                           }
-                          
+
                           p <- ggplot(plot_df, aes(x = Dim1, y = Dim2))
-                          
+
                           if (!is.null(self$labels_var)) {
                             p <- p +
                               geom_point(aes(color = Cluster, shape = Type), alpha = 0.7, size = 4) +
@@ -589,7 +589,7 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                                                             "Qualitative" = "coral")) +
                               labs(color = "Variable type")
                           }
-                          
+
                           p <- p +
                             ggrepel::geom_text_repel(aes(label = Variable), size = 3.5,
                                                      max.overlaps = 20, fontface = "bold") +
@@ -603,11 +603,11 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                             theme_minimal() +
                             theme(panel.grid.minor = element_blank(),
                                   legend.position = "right")
-                          
+
                           print(p)
                           invisible(self)
                         },
-                        
+
                         #' @description
                         #' Apply elbow method to determine optimal number of clusters
                         #'
@@ -643,24 +643,24 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           if (is.null(self$coord_var)) {
                             stop("Error: You must first run fit()!")
                           }
-                          
+
                           cat("\n========================================\n")
                           cat("ELBOW METHOD\n")
                           cat("========================================\n\n")
-                          
+
                           n_vars <- nrow(self$coord_var)
                           max_clusters <- min(max_clusters, n_vars - 1)
-                          
+
                           dist_matrix <- dist(self$coord_var)
-                          
+
                           if (method == "ward") {
                             hc <- hclust(dist_matrix, method = "ward.D2")
                           } else {
                             hc <- hclust(dist_matrix, method = method)
                           }
-                          
+
                           inertias <- numeric(max_clusters - 1)
-                          
+
                           for (k in 2:max_clusters) {
                             clusters <- cutree(hc, k = k)
                             total_inertia <- 0
@@ -674,12 +674,12 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                             }
                             inertias[k - 1] <- total_inertia
                           }
-                          
+
                           elbow_df <- data.frame(
                             K = 2:max_clusters,
                             Inertia = inertias
                           )
-                          
+
                           p <- ggplot(elbow_df, aes(x = K, y = Inertia)) +
                             geom_line(color = "steelblue", linewidth = 1.2) +
                             geom_point(color = "steelblue", size = 3.5) +
@@ -693,14 +693,14 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                             scale_x_continuous(breaks = 2:max_clusters) +
                             theme_minimal() +
                             theme(panel.grid.minor = element_blank())
-                          
+
                           print(p)
                           cat("💡 Suggestion: Look for the 'elbow' in the curve\n")
                           cat("   where inertia decreases less rapidly.\n\n")
-                          
+
                           invisible(self)
                         },
-                        
+
                         #' @description
                         #' Evaluate clustering quality using silhouette
                         #'
@@ -733,24 +733,24 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           if (is.null(self$labels_var)) {
                             stop("Error: You must first run clustering_hierarchical()!")
                           }
-                          
+
                           cat("\n========================================\n")
                           cat("VARIABLE CLUSTERING QUALITY\n")
                           cat("========================================\n\n")
-                          
+
                           dist_matrix <- dist(self$coord_var)
                           sil <- silhouette(self$labels_var, dist_matrix)
                           avg_sil_width <- mean(sil[, 3])
-                          
+
                           cat(sprintf("✓ Average silhouette width: %.3f\n\n", avg_sil_width))
-                          
+
                           fviz_silhouette(sil) +
                             ggtitle("Silhouette of variable clustering (FAMD)") +
                             theme_minimal()
-                          
+
                           invisible(self)
                         },
-                        
+
                         #' @description
                         #' Display summary of analysis results
                         #'
@@ -778,35 +778,35 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           cat("\n═══════════════════════════════════════════════════\n")
                           cat("  FAMD + VARIABLE CLUSTERING RESULTS\n")
                           cat("═══════════════════════════════════════════════════\n\n")
-                          
+
                           if (!is.null(self$data)) {
                             cat(sprintf("📊 Analysis performed on %d individuals and %d variables\n\n",
                                         nrow(self$data), ncol(self$data)))
-                            
+
                             cat(sprintf("Data type: %s\n", toupper(self$data_type)))
                             cat(sprintf("  • Quantitative variables: %d\n", length(self$quanti_vars)))
                             cat(sprintf("  • Qualitative variables: %d\n\n", length(self$quali_vars)))
                           }
-                          
+
                           if (!is.null(self$famd_result)) {
                             cat(sprintf("📈 Principal components: %d\n", self$n_components))
                             cat(sprintf("📈 Total explained inertia: %.2f%%\n\n",
                                         sum(self$inertia_explained[1:min(self$n_components,
                                                                          length(self$inertia_explained))])))
                           }
-                          
+
                           if (!is.null(self$labels_var)) {
                             cat(sprintf("🎯 Clustering performed: %d clusters (method: %s)\n",
                                         self$n_clusters, self$clustering_method))
                             cat(sprintf("🎯 Total number of variables: %d\n\n", length(self$labels_var)))
-                            
+
                             cat("📋 Variable distribution:\n")
                             for (i in 1:self$n_clusters) {
                               vars <- names(self$labels_var[self$labels_var == i])
                               cat(sprintf("   Cluster %d: %d variables\n", i, length(vars)))
                             }
                           }
-                          
+
                           cat("\n🔍 Available objects:\n")
                           cat("   $famd_result        : Complete FAMD result\n")
                           cat("   $coord_var          : Variable coordinates\n")
@@ -815,10 +815,10 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                           cat("   $inertia_explained  : % explained inertia\n")
                           cat("   $data               : Training data\n")
                           cat("\n")
-                          
+
                           invisible(self)
                         },
-                        
+
                         #' @description
                         #' Display detailed summary of variable clusters
                         #'
@@ -848,29 +848,29 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                             cat("   Use clustering_hierarchical() first.\n")
                             return(invisible(self))
                           }
-                          
+
                           cat("\n═══════════════════════════════════════════════════\n")
                           cat("  INTERPRETATION OF VARIABLE CLUSTERS\n")
                           cat("═══════════════════════════════════════════════════\n\n")
-                          
+
                           n_clusters <- max(self$labels_var)
-                          
+
                           for (i in 1:n_clusters) {
                             vars_in_cluster <- names(self$labels_var[self$labels_var == i])
-                            
+
                             cat(sprintf("━━━ CLUSTER %d (%d variables) ━━━\n", i, length(vars_in_cluster)))
-                            
+
                             # Separate quanti and quali
                             vars_quanti <- vars_in_cluster[vars_in_cluster %in% self$quanti_vars]
                             vars_quali <- vars_in_cluster[vars_in_cluster %in% self$quali_vars]
-                            
+
                             if (length(vars_quanti) > 0) {
                               cat("\n  📊 Quantitative variables:\n")
                               for (var in vars_quanti) {
                                 cat(sprintf("     • %s\n", var))
                               }
                             }
-                            
+
                             if (length(vars_quali) > 0) {
                               cat("\n  📝 Qualitative variables:\n")
                               for (var in vars_quali) {
@@ -878,36 +878,10 @@ CAH_mixtes <- R6Class("CAH_mixtes",
                               }
                             }
                           }
-                          
+
                           cat("═══════════════════════════════════════════════════\n\n")
-                          
+
                           invisible(self)
                         }
                       )
 )
-
-
-# Create a CAH_mixtes object with 5 components
-model <- CAH_mixtes$new(n_components = 5)
-#'
-#' # Load mixed data
-data <- data.frame(
-age = c(25, 30, 35, 40, 45),
-income = c(30000, 45000, 60000, 75000, 90000),
-category = factor(c("A", "B", "A", "C", "B")),
-level = factor(c("low", "medium", "high", "high", "medium"))
-)
-#'
-#' # Perform FAMD analysis
-model$fit(data)
-#'
-#' # Perform hierarchical clustering
-model$clustering_hierarchical(n_clusters = 2, method = "ward")
-#'
-#' # Visualize results
-model$plot_variables(axes = c(1, 2))
-model$dendo()
-model$qualite_clustering()
-#'
-#' # Display summary
-model$summary()
