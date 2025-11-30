@@ -28,8 +28,7 @@ Suggests:
 Config/testthat/edition: 3
 Collate: 
     'CAH.R'
-    'FAMD.R'
-    'FAMD_finale.R'
+    'FAMD_finale.R'    
     'mon_kmeans.R'
     'clusterVariable.R'
 Depends: 
