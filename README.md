@@ -78,7 +78,7 @@ shiny::runApp(system.file("app", package = "ClusterVariable"))
 ```
 ## Installation from the ZIP file
 
-🚀 To install the package from the provided ZIP file, run:
+⚙️ To install the package from the provided ZIP file, run:
 
 ```r
 install.packages("ClusterVariable_0.1.0.zip", repos = NULL, type = "win.binary")
@@ -173,7 +173,7 @@ shiny::runApp()
 
 ### Application features
 
--> Application : https://master2-sise.shinyapps.io/cluster-variables/ 
+ Application : https://master2-sise.shinyapps.io/cluster-variables/ 
 
 1. **Data import**: CSV and Excel support, column selection
 2. **Cleaning**: Imputation of missing values
@@ -183,8 +183,20 @@ shiny::runApp()
 
 ---
 
-## 📖 Documentation
+## 📚 Documentation
 
+- Rakotomalala, R. (2020). *Classification ascendante hiérarchique*. Université Lumière Lyon 2.
+- Rakotomalala, R. (2020). *Analyse de données multidimensionnelles*. Université Lumière Lyon 2.
+- Rakotomalala, R. (2020). *Les classes R6 sous R : Programmation orientée objet*. Université Lumière Lyon 2.
+- Rakotomalala, R. (2019). *Tanagra – Hierarchical Agglomerative Clustering with PCA*. Université Lumière Lyon 2.
+- Rakotomalala, R. (2020). *CAH et K-Means sous Python*. Université Lumière Lyon 2.
+- Rakotomalala, R. (2025). *Orange Data Mining – Clustering – CAH des variables*. YouTube.
+- Rakotomalala, R. (2025). *Orange Data Mining – ACP*. YouTube.
+- Rakotomalala, R. (2022). *Tanagra – ACP #6 – Tandem clustering : ACP + CAH*. YouTube.
+- Rakotomalala, R. *Pratique Méthodes Factorielles v1.0 – Chapitres 5 et 6*. Université Lumière Lyon 2.
+- Rakotomalala, R. *Classification des variables qualitatives*. Université Lumière Lyon 2.
+- Rakotomalala, R. *Analyse factorielle des données mixtes*. Université Lumière Lyon 2.
+- Lebart, L., Morineau, A., & Piron, M. *Statistique exploratoire multidimensionnelle* (4e éd.). Dunod.
 
 
 
@@ -289,6 +301,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
