@@ -250,12 +250,22 @@ ClusterVariable/
 │   └── FAMD_finale.R            # Mixed data (class R6)
 ├── man/                         # Documentation
 │   ├── CAH.Rd
+│   ├── FADM.Rd
 │   └── clusterVariable.Rd
-├── app/                         # Shiny Application
+├── inst/ app/               # Shiny Application included in the package
+│   ├── app.Rproj            # RStudio project file for the Shiny app
+│   ├── FAMD_finale.R        # FAMD module for mixed data
+│   ├── CAH.R                # CAH module used inside the Shiny app
+│   ├── clusterVariable.R    # K-means module for the Shiny app
+│   ├── mon_kmeans.R         # K-means internal implementation used in the app
+│   ├── rsconnect/shinyapps.io/master2-sise
+│   │   └── cluster-variables.dcf     # Deployment configuration for shinyapps.io
+│   ├── www
+│   │   └── logo          # Static assets (images, CSS, icons…)
 │   ├── ui.R
 │   └── server.R
 ├── tests/                       # Unit tests
-│   └── testthat/
+│   └── testthat/.*R
 ├── DESCRIPTION                 # Package metadata
 ├── NAMESPACE                   # Exported functions
 └── README.md                    # This file
@@ -270,6 +280,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
