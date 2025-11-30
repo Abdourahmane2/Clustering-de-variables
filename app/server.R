@@ -1,8 +1,20 @@
+library(shiny)
 library(DT)
 library(readxl)
-library(shiny)
 library(shinyjs)
-library(ClusterVariable)
+library(FactoMineR)
+library(factoextra)
+library(cluster)
+library(ggplot2)
+library(dplyr)
+library(R6)
+library(ggrepel)
+
+
+source("FAMD_finale.R")
+source("clusterVariable.R")
+source("CAH.R")
+source("mon_kmeans.R")
 
 server <- function(input, output, session) {
 
