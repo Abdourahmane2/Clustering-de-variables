@@ -177,8 +177,10 @@ shiny::runApp()
 
 ### Application features
 
-📺 **Demo video:**
-https://youtu.be/QLcB4dYoyZ0
+### 🎥 Video Demonstration
+
+[![Watch the video](https://img.youtube.com/vi/QLcB4dYoyZ0/0.jpg)](https://www.youtube.com/watch?v=QLcB4dYoyZ0)
+
 
  Application : https://master2-sise.shinyapps.io/cluster-variables/ 
 
@@ -308,6 +310,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
