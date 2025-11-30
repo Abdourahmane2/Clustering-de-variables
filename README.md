@@ -58,6 +58,9 @@
 
 ##  Installation
 
+✅ Please update your R installation to version 4.4 or higher (i.e., above 4.3).
+🔥 https://cran.rstudio.com/bin/windows/base/
+
 ### From GitHub
 
 ```r
@@ -280,6 +283,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
