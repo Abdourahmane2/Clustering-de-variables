@@ -708,21 +708,4 @@ Summary a detailed summary of the CAH model
 \if{html}{\out{</div>}}
 }
 }
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-CAH-clone"></a>}}
-\if{latex}{\out{\hypertarget{method-CAH-clone}{}}}
-\subsection{Method \code{clone()}}{
-The objects of this class are cloneable with this method.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{CAH$clone(deep = FALSE)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{deep}}{Whether to make a deep clone.}
-}
-\if{html}{\out{</div>}}
-}
-}
 }
