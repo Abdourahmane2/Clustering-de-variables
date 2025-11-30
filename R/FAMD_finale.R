@@ -13,7 +13,7 @@ library(ggrepel)
 
 
 
-#' CAH_mixtes: Hierarchical Clustering of Variables on Mixed Data
+#' FAMD : Hierarchical Clustering of Variables on Mixed Data
 #'
 #' @description
 #' R6 class to perform factor analysis of mixed data (FAMD)
@@ -22,7 +22,7 @@ library(ggrepel)
 #' based on their coordinates in the factorial space.
 #'
 #' @details
-#' The CAH_mixtes class combines two main analyses:
+#' The FAMD class combines two main analyses:
 #' \itemize{
 #'   \item \strong{FAMD (Factor Analysis of Mixed Data)}: Factor analysis
 #'         adapted to data containing both quantitative and qualitative variables
