@@ -82,6 +82,10 @@ shiny::runApp(system.file("app", package = "ClusterVariable"))
 
 ```r
 install.packages("ClusterVariable_0.1.0.zip", repos = NULL, type = "win.binary")
+
+#Download the library
+libray(ClusterVariable)
+
 ```
 
 ## 🚀 Usage
@@ -301,6 +305,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
