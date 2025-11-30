@@ -62,26 +62,18 @@
 
 ```r
 # Install devtools if necessary
-if (!requireNamespace(“devtools”, quietly = TRUE)) {
-  install.packages(“devtools”)
-}
+install.packages("devtools")
+
+# Install the dependencies manually 
+install.packages(c("R6", "stats", "FactoMineR", "factoextra", 
+                   "cluster", "pheatmap", "ggplot2", "shiny", "readxl", "shinyjs"))
 
 # Install ClusterVariable from GitHub
-devtools::install_github(“Abdourahmane2/ClusterVariable”, dependencies = TRUE)
+remote::install_github("Abdourahmane2/Clustering-de-variables")
+
+#Run the app
+shiny::runApp(system.file("app", package = "ClusterVariable"))
 ```
-
-
-
-### Dependencies
-
-If needed to install the dependencies manually : 
-
-```r
-install.packages(c(“R6”, “stats”, ‘FactoMineR’, “factoextra”, 
-                   “cluster”, “pheatmap”, ‘ggplot2’, “shiny”))
-```
-
----
 
 ## 🚀 Usage
 
@@ -171,6 +163,8 @@ shiny::runApp()
 ```
 
 ### Application features
+
+-> Application : https://master2-sise.shinyapps.io/cluster-variables/ 
 
 1. **Data import**: CSV and Excel support, column selection
 2. **Cleaning**: Imputation of missing values
@@ -276,6 +270,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
