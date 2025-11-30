@@ -76,6 +76,13 @@ remote::install_github("Abdourahmane2/Clustering-de-variables")
 #Run the app
 shiny::runApp(system.file("app", package = "ClusterVariable"))
 ```
+## Installation from the ZIP file
+
+🚀 To install the package from the provided ZIP file, run:
+
+```r
+install.packages("ClusterVariable_0.1.0.zip", repos = NULL, type = "win.binary")
+```
 
 ## 🚀 Usage
 
@@ -86,7 +93,7 @@ library(ClusterVariable)
 
 # Load data
 data(mtcars)
-df <- mtcars[, c(“mpg”, “disp”, “hp”, “drat”, ‘wt’, “qsec”)]
+df <- mtcars[, c("mpg", "disp", "hp", "drat", "wt", "qsec")]
 
 # Initialize and fit the model
 cah <- CAH$new()
@@ -100,7 +107,7 @@ cah$print()
 cah$summary()
 
 # Visualize
-cah$plot(“dendrogram”)
+cah$plot("dendrogram")
 ```
 
 Example 2: K-means
@@ -282,6 +289,7 @@ ClusterVariable/
 - **Abdourahmane**
 - **Milena**
 - **Marvin** 
+
 
 
 
