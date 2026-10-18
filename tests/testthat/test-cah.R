@@ -5,11 +5,9 @@
 library(testthat)
 library(R6)
 
-# Load CAH class
-if(file.exists("../R/CAH.R")) {
-  source("../R/CAH.R")
-} else {
-  source("C:/Users/gopit/OneDrive/Documents/MASTER2SISE/Projet_R_Clusting/Clustering-de-variables/R/CAH.R")
+# Load CAH class (already loaded when tests run through the package)
+if (!exists("CAH")) {
+  source(testthat::test_path("..", "..", "R", "CAH.R"))
 }
 
 
