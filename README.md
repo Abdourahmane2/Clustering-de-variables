@@ -71,7 +71,7 @@ install.packages(c("R6", "stats", "FactoMineR", "factoextra",
                    "cluster", "pheatmap", "ggplot2", "shiny", "readxl", "shinyjs"))
 
 # Install ClusterVariable from GitHub
-remote::install_github("Abdourahmane2/Clustering-de-variables")
+remotes::install_github("Abdourahmane2/Clustering-de-variables")
 
 #Run the app
 shiny::runApp(system.file("app", package = "ClusterVariable"))
@@ -83,8 +83,8 @@ shiny::runApp(system.file("app", package = "ClusterVariable"))
 ```r
 install.packages("ClusterVariable_0.1.0.zip", repos = NULL, type = "win.binary")
 
-#Download the library
-libray(ClusterVariable)
+# Load the package
+library(ClusterVariable)
 
 ```
 
